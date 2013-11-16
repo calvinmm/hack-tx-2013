@@ -137,6 +137,10 @@ function setupRoom(room_id) {
     // update page with room_id
     // window.history.pushState();
 
+    clientStartLoops();
+}
+
+function clientStartLoops() {
     // update peers
     window.setInterval(function() {
         refreshPeers();
@@ -152,4 +156,12 @@ function setupRoom(room_id) {
 (function checkRoomExists() {
     // TODO
     // if we have id, kill page, show only setup
+
+    // set global loop id
+    // call looping functions
+    var path = window.location.pathname;
+    if (path.substring(1).match(/^\d+$/).length) {
+        global_room_id = Number(path.substring(1));
+        clientStartLoops();
+    }
 })();
