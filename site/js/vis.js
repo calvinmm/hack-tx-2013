@@ -96,8 +96,6 @@ function Point(x, y) {
 }
 
 function Link(a, b) {
-  //debugger;
-  //console.log(currenttransfers);
   this.a = a;
   this.b = b;
 	var dx = a.x - b.x;
@@ -107,14 +105,12 @@ function Link(a, b) {
 }
 
 Link.prototype.update = function(distToMove) {
-   //debugger;
 	var distleft = (1 - this.u) * this.len;
 	if (distleft < distToMove) {
 		this.u = 1.0;
 		return distToMove - distleft;
 	}
 	this.u += 1.0 * distToMove / this.len;
-  //console.log('moved u to ' + this.u);
 	return 0;
 };
 
@@ -141,14 +137,12 @@ addTransfer = function(userid, file_id, chunkid, downloading) {
 	}
 	var fnode = undefined;
 	for (var i = 0; i < fileNodes.length; i++) {
-    //console.log(fileNodes[i].id);
 		if (fileNodes[i].id == file_id) {
 			fnode = fileNodes[i];
 			break;
 		}
 	}
 
-  // this has a bug, fnode is null?
 	currenttransfers.push( new Transfer(unode.point, center, downloading, userid, file_id, chunkid, fnode.filledStyle) );
 };
 
@@ -164,6 +158,7 @@ removeTransfer = function(uid, file_id, chunkid, downloading) {
 
 // transferring file chunk of file pointfile from user a to user b
 function Transfer(pointuser, pointfile, downloading, uid, fid, cid, color) {
+	console.log('making new transfer with file', fid, 'and downloading = ', downloading);
 	this.a = (downloading) ? pointuser : pointfile;
 	this.b = (downloading) ? pointfile : pointuser;
 	this.cur = new Link(this.a, this.b);
@@ -425,9 +420,9 @@ updateState = function() {
     	  }
 			}
 			if (!found) {
-        //console.log(trans);
+        console.log(trans);
         //console.log("1) calling addTransfer: " + trans + ", " + trans.file_id + ", " + trans.chunkid);
-        addTransfer(userid, trans.file_id, trans.chunkid, false);
+        addTransfer(userid, trans.file_id, trans.block, false);
       }
 		}
     trans = state.transfers[userid].rec_block;
