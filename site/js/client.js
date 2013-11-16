@@ -246,7 +246,8 @@ function sendMessage(message, rec) {
       // Retry if other user hasn't connected yet
       if (!retry_limits[rec]) {
         retry_limits[rec] = 1;
-      } else if (retry_limits[rec] < RETRY_LIMIT) {
+      }
+      if (retry_limits[rec] < RETRY_LIMIT) {
         retry_limits[rec] += 1;
         sendMessage(message, rec);
       } else {
