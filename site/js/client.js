@@ -1,7 +1,21 @@
 
 // TODO: fill in these global fields from server api calls
-var me = "myrandomid" + Math.random();
+var BROKER_HOST = "ec2-54-201-76-213.us-west-2.compute.amazonaws.com";
+var BROKER_PORT = 8080;
+
+var peer = new Peer({
+  host: BROKER_HOST,
+  port: BROKER_PORT,
+  reliable: true
+});
+
+var me = "";
 var master = "master";
+
+// Connect to the broker server
+peer.on('open', function(id) {
+  me = id;
+});
 
 var BLOCK_SIZE = 4096;
 
@@ -24,29 +38,148 @@ var message_types = {
   RES_BLOCK : 3
 };
 
-// Should be called when a file is selected
-function handleFileSelect(evt) {
-  evt.stopPropagation();
-  evt.preventDefault();
+function masterStart(filesToUpload) {
+  if (filesToUpload.length == 0) {
+    return;
+  }
+  registerRoom().then(function(room_id) {
+    var file_registrations = [];
+    for (var i = 0; i < filesToUpload.length; i++) {
+      file_registrations.push(registerFile(room_id, filesToUpload[i]));
+    }
+    return $.when.apply($, file_registrations).done(function() {
+      // woohoo we've registered all the files
+      setupRoom(room_id);
+    });
+  });
+}
 
-  var files = evt.dataTransfer.files; // FileList object.
+function registerFile(room_id, file) {
+  var deferred = $.Deferred();
+  $.post('/api/new_file', {
+    size: file.size,
+    room_id: room_id,
+    peer_id: me
+  }, function(file_id) {
+    masterAddedFile(file, file_id);
+    deferred.resolve();
+  });
+  return deferred;
+}
 
-  // files is a FileList of File objects. List some properties.
-  var output = [];
-  for (var i = 0, f; f = files[i]; i++) {
-    masterAddedFile(f);
+function registerRoom() {
+  var deferred = $.Deferred();
+  $.post('/api/new_room', function(data) {
+    deferred.resolve(data);
+  });
+  return deferred;
+}
+
+function informServer(file_id, block_num) {
+  $.post("/api/update/" + file_id, {peer_id: me, block_id: block_num}, function(data) {
+    // Don't really care about a response
+    console.log("update response: ", data);
+  });
+}
+
+function getParticipants() {
+  // Initially called to get all people in room, recursively called for
+  // continuous updates
+  // Assume that all involved peers are involved in all files
+  var file_id = "";
+  for (var file in state.files) {
+    if (state.files.hasOwnProperty(file)) {
+      file_id = file;
+      break;
+    }
+  }
+  if (file_id == "") {
+    return;
+  }
+  $.get("/api/subscribe/" + file_id + "?peer_id=" + me, function(data) {
+    addNewPeers(data);
+    getParticipants();
+  });
+}
+
+function addNewPeers(new_peers) {
+  for (var i = 0; i < new_peers.length; i++) {
+    var p = new_peers[i];
+    if (state.others.indexOf(p) != -1) {
+      continue;
+    }
+    addPeer(p);
   }
 }
 
-function masterAddedFile(file) {
-  var id = guid();
+function addPeer(peer_id) {
+  state.others.push(p);
+  if (!state.other_states[p]) {
+    state.other_states[p] = [];
+  }
+  connections[peer] = {};
+  var message_conn = peer.connect(peer_id);
+  message_conn.open('open', function() {
+    message_conn.on('data', processMessage);
+    connections[peer].message = message_conn;
+    if (me == master) {
+      sendFileDescriptors(peer);
+    }
+  });
+  var data_conn = peer.connect(peer_id);
+  data_conn.open('open', function() {
+    data_conn.on('data', processData);
+    connections[peer].data = data_conn;
+  });
+}
+
+function emptyFiles() {
+  if (!state.files) {
+    return false;
+  }
+  for (var v in state.files) {
+    if (state.files.hasOwnProperty(v)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function updateOtherState() {
+  if (emptyFiles()) {
+    console.log("Doesn't know of any files. ");
+    if (global_room_id == -1) {
+      return;
+    }
+    $.get("/api/files/" + global_room_id, function(data) {
+      console.log("got /api/files", data);
+      for (var i = 0; i < data.length; i++) {
+        state.files[data[i]] = {};
+      }
+      updateOtherState();
+    });
+    return;
+  }
+  for (var file_id in state.files) {
+    if (state.files.hasOwnProperty(file_id)) {
+      // fire off ajax request
+      $.get("/api/status/" + file_id, function(data) {
+
+        state.other_states = data;
+      })
+    }
+  }
+}
+
+function masterAddedFile(file, file_id) {
+  master = me;
   var n = Math.ceil(file.size / BLOCK_SIZE);
   var blocks = [];
   for (var i = 0; i < n; i++) {
     blocks.push(i);
   }
-  file_handles[id] = file;
-  state.files[id] = {
+  file_handles[file_id] = file;
+  state.files[file_id] = {
     name: file.name,
     size: file.size,
     num_blocks: n,
@@ -71,6 +204,7 @@ function processMessage(message) {
   if (message.type == message_types.REQ_FILES) {
     sendFileDescriptors(sender);
   } else if (message.type == message_types.RES_FILES) {
+    master = sender;
     addFiles(message.data);
   } else if (message.type = message_types.REQ_BLOCK) {
     sendBlock(message.file_id, message.block_num, sender)
@@ -129,6 +263,12 @@ function addFiles(descripts) {
         state.files[f] = descripts;
       }
     }
+  }
+}
+
+function refreshPeers() {
+  for (var i = 0; i < state.others.length; i++) {
+    updatePeer(state.others[i]);
   }
 }
 
@@ -191,6 +331,7 @@ function writeBlock(file_id, block_num, data, sender) {
       fileWriter.onwriteend = function(e) {
         addReceivedBlock(file_id, block_num);
         updateBlockReceiving("", -1, sender);
+        informServer(file_id, block_num);
         checkDoneWithFile(file_id);
       };
       fileWriter.onerror = function(e) {
@@ -321,15 +462,4 @@ function sendFSBlock(file_id, block_num , rec) {
       reader.readAsArrayBuffer(file);
     });
   });
-}
-
-function s4() {
-  return Math.floor((1 + Math.random()) * 0x10000)
-    .toString(16)
-    .substring(1);
-}
-
-function guid() {
-  return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
-    s4() + '-' + s4() + s4() + s4();
 }

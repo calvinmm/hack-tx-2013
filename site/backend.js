@@ -7,8 +7,15 @@ var Q = require('q');
 app.use(connect.urlencoded());
 app.use(connect.json());
 
-var conString = "postgres://postgres@localhost/hacktx";
-var client = new pg.Client(conString);
+var connection_config =  {
+  user: 'adamf',
+  database: 'hacktx',
+  host: 'localhost',
+  port: 5432,
+  password: 'hacktx'
+};
+
+var client = new pg.Client(connection_config);
 var query = Q.nbind(client.query, client);
 
 function get_peers_for_fileid(file_id) {
@@ -70,26 +77,65 @@ function add_peer(file_id, peer_id) {
                [peer_id, file_id]);
 }
 
+function add_file(size, room_id) {
+  return query('INSERT INTO files (size, room_id)' +
+               'VALUES ($1, $2) RETURNING file_id', [size, room_id])
+  .then(function(result) {
+    return result.rows[0].file_id;
+  });
+}
+
+function add_room() {
+  return query('INSERT INTO rooms DEFAULT VALUES RETURNING room_id')
+  .then(function(result) {
+    return result.rows[0].room_id;
+  });
+}
+
+function get_files_for_room(room_id) {
+  return query('SELECT file_id FROM files WHERE room_id=$1', [room_id])
+  .then(function(result) {
+    return result.rows.map(function(row) {
+      return row.file_id;
+    });
+  });
+}
+
 Q.ninvoke(client, "connect").then(
   function() {
 
     // Maps from file_ids to res's that are subscribed to the file
     var subscribers = {};
 
+    app.post('/new_room', function(req, res) {
+      add_room().then(
+        function(room_id) {
+          res.send(room_id.toString());
+        }
+      );
+    });
+
+
     app.post('/new_file', function(req, res) {
       var size = parseInt(req.body.size);
-      query('INSERT INTO files (size) VALUES ($1) RETURNING file_id', [size])
-        .then(
-          function(result) {
-            var file_id = result.rows[0].file_id;
-            res.send(file_id.toString());
-          }
+      var room_id = parseInt(req.body.room_id);
+      add_file(size, room_id).then(
+        function(file_id) {
+          res.send(file_id.toString());
+        }
       ).catch(
         function(err) {
           console.err('Error creating file', err);
           res.send('errror: ' + err);
         }
       );
+    });
+
+    app.get('/files/:room_id', function(req, res) {
+      var room_id = req.params.room_id;
+      get_files_for_room(room_id).then(function(files) {
+        res.send(files);
+      });
     });
 
     app.get('/subscribe/:file_id', function(req, res) {
