@@ -26,3 +26,27 @@ button.pad {
     color: #d9534f;
     font-size: 13px;
 }
+
+#progress {
+    width: 500px;
+    margin: 20px auto;
+    padding-left: 30px;
+    padding-right: 30px;
+}
+
+#display {
+    border: 2px dashed #ccc;
+    height: 480px;
+    width: 640px;
+    margin: 20px auto;
+}
+
+@media (min-width: 768px) {
+  .container-narrow {
+    max-width: 730px;
+  }
+}
+
+#container-nopad {
+    padding-top: 0px !important;
+}

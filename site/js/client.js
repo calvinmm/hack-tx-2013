@@ -32,24 +32,48 @@ var file_handles = {};
 var finished_files = {};
 
 var message_types = {
-  REQ_FILES : 0,
-  RES_FILES : 1,
-  REQ_BLOCK : 2,
-  RES_BLOCK : 3
+  RES_FILES : 0,
+  REQ_BLOCK : 1,
+  RES_BLOCK : 2
 };
 
 function masterStart(filesToUpload) {
   if (filesToUpload.length == 0) {
     return;
   }
-  for (var i = 0; i < filesToUpload.length; i++) {
-    masterAddedFile(filesToUpload[i]);
-  }
-  // TODO: register room
-  var room_id = "ahsldfkjl";
-  setupRoom(room_id);
-  // TODO: register each file with the room
-  // TODO: tell server we have every part of every file
+  registerRoom().then(function(room_id) {
+    var file_registrations = [];
+    for (var i = 0; i < filesToUpload.length; i++) {
+      file_registrations.push(registerFile(room_id, filesToUpload[i]));
+    }
+    return $.when.apply($, file_registrations).done(function() {
+      // woohoo we've registered all the files
+      setupRoom(room_id);
+    });
+  });
+}
+
+function registerFile(room_id, file) {
+  var deferred = $.Deferred();
+  $.post('/api/new_file', {
+    size: file.size,
+    room_id: room_id,
+    peer_id: me
+  }, function(file_id) {
+    console.log("should be file_id", file_id);
+    masterAddedFile(file, file_id);
+    deferred.resolve();
+  });
+  return deferred;
+}
+
+function registerRoom() {
+  var deferred = $.Deferred();
+  $.post('/api/new_room', function(data) {
+    console.log("should be room_id", data);
+    deferred.resolve(data);
+  });
+  return deferred;
 }
 
 function informServer(file_id, block_num) {
@@ -63,7 +87,6 @@ function getParticipants() {
   // Initially called to get all people in room, recursively called for
   // continuous updates
   // Assume that all involved peers are involved in all files
-  // TODO: remove this assumption
   var file_id = "";
   for (var file in state.files) {
     if (state.files.hasOwnProperty(file)) {
@@ -75,9 +98,22 @@ function getParticipants() {
     return;
   }
   $.get("/api/subscribe/" + file_id + "?peer_id=" + me, function(data) {
+    console.log("should be an array of peers", data);
     addNewPeers(data);
     getParticipants();
   });
+}
+
+function addNewPeersFromNewState(other_state) {
+  var peer_list = [];
+  for (var p in other_state) {
+    if (other_state.hasOwnProperty(p)) {
+      peer_list.push(p);
+    }
+  }
+  if (peer_list.length > 0) {
+    addNewPeers(peer_list);
+  }
 }
 
 function addNewPeers(new_peers) {
@@ -111,27 +147,54 @@ function addPeer(peer_id) {
   });
 }
 
+function emptyFiles() {
+  if (!state.files) {
+    return false;
+  }
+  for (var v in state.files) {
+    if (state.files.hasOwnProperty(v)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function updateOtherState() {
+  if (emptyFiles()) {
+    console.log("Doesn't know of any files. ");
+    if (global_room_id == -1) {
+      return;
+    }
+    $.get("/api/files/" + global_room_id, function(data) {
+      console.log("got /api/files", data);
+      for (var i = 0; i < data.length; i++) {
+        state.files[data[i]] = {};
+      }
+      updateOtherState();
+    });
+    return;
+  }
   for (var file_id in state.files) {
     if (state.files.hasOwnProperty(file_id)) {
       // fire off ajax request
       $.get("/api/status/" + file_id, function(data) {
+        console.log("should be the new other_state", data);
+        addNewPeersFromNewState(data);
         state.other_states = data;
       })
     }
   }
 }
 
-function masterAddedFile(file) {
+function masterAddedFile(file, file_id) {
   master = me;
-  var id = guid();
   var n = Math.ceil(file.size / BLOCK_SIZE);
   var blocks = [];
   for (var i = 0; i < n; i++) {
     blocks.push(i);
   }
-  file_handles[id] = file;
-  state.files[id] = {
+  file_handles[file_id] = file;
+  state.files[file_id] = {
     name: file.name,
     size: file.size,
     num_blocks: n,
@@ -153,9 +216,7 @@ function sendData(message, rec) {
 
 function processMessage(message) {
   var sender = message.sender;
-  if (message.type == message_types.REQ_FILES) {
-    sendFileDescriptors(sender);
-  } else if (message.type == message_types.RES_FILES) {
+  if (message.type == message_types.RES_FILES) {
     master = sender;
     addFiles(message.data);
   } else if (message.type = message_types.REQ_BLOCK) {
@@ -181,14 +242,6 @@ function processData(message) {
 
 function hasBlock(file_id, block_num) {
   return state.files[file_id].blocks.indexOf(block_num) != -1
-}
-
-// Asks someone for file descriptors
-function reqFiles(rec) {
-  var message = {
-    type : message_types.REQ_FILES
-  };
-  sendMessage(message, rec);
 }
 
 // Sends the file descriptions we know of to rec
@@ -219,7 +272,9 @@ function addFiles(descripts) {
 }
 
 function refreshPeers() {
-  // TODO: call updatePeer on everyone
+  for (var i = 0; i < state.others.length; i++) {
+    updatePeer(state.others[i]);
+  }
 }
 
 function updatePeer(peer_id) {
@@ -412,15 +467,4 @@ function sendFSBlock(file_id, block_num , rec) {
       reader.readAsArrayBuffer(file);
     });
   });
-}
-
-function s4() {
-  return Math.floor((1 + Math.random()) * 0x10000)
-    .toString(16)
-    .substring(1);
-}
-
-function guid() {
-  return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
-    s4() + '-' + s4() + s4() + s4();
 }
