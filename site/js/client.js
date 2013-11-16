@@ -238,19 +238,12 @@ var DELAY = 0;
 function sendMessage(message, rec) {
   message.sender = me;
   setTimeout(function() {
-<<<<<<< HEAD
     if (connections[rec] === undefined) {
       // Retry if other user hasn't connected yet
       sendMessage(message, rec);
     } else {
       connections[rec].send(message);
     }
-=======
-    //console.log(connections);
-    //console.log(connections[rec]);
-    //console.log(rec);
-    connections[rec].send(message);
->>>>>>> 3c02349087e12f84ce725adbb189dfe885385d65
   }, DELAY);
 }
 
