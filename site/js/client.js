@@ -483,15 +483,8 @@ function updateBlockSending(file_id, block_num, peer_id) {
       rec_block: {file_id: "", block: -1}
     };
   }
-  var update = function() {
-    state.transfers[peer_id].send_block.file_id = file_id;
-    state.transfers[peer_id].send_block.block = block_num;
-  };
-  if (block_num != -1) {
-    update();
-  } else {
-    setTimeout(update(), 100);
-  }
+  state.transfers[peer_id].send_block.file_id = file_id;
+  state.transfers[peer_id].send_block.block = block_num;
 }
 
 function sendBlock(file_id, block_num, rec) {
@@ -518,6 +511,10 @@ function sendSlicedBlock(file_id, block_num, rec) {
         data_type: file.type
       };
       sendMessage(m, rec);
+      if (!state.uploaded) {
+        state.uploaded = [];
+      }
+      state.uploaded.push({user_id: rec, file_id: file_id});
       updateBlockSending("", -1, rec);
     }
   };
@@ -540,7 +537,11 @@ function sendFSBlock(file_id, block_num , rec) {
           data: evt.target.result,
           data_type: file.type
         };
-        sendMessage(m, rec);
+        sendMessage(m, rec);x
+        if (!state.uploaded) {
+          state.uploaded = [];
+        }
+        state.uploaded.push({user_id: rec, file_id: file_id});
         updateBlockSending("", -1, rec);
       };
       reader.readAsArrayBuffer(file);

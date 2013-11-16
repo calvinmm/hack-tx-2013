@@ -166,12 +166,14 @@ function Transfer(pointuser, pointfile, downloading, uid, fid, color) {
 	this.uid = uid;
 	this.file_id = fid;
 	this.color = color;
+  this.loopedonce = false;
 };
 
 Transfer.prototype.update = function(distToMove) {
 	var left = this.cur.update(distToMove);
 	while (left > 0) {
 		this.cur.reset();
+    this.loopedonce = true;
 		left = this.cur.update(left);
 	}
 };
@@ -260,7 +262,6 @@ draw = function() {
     if (currenttransfers[i].cur.u < 0) {
       continue;
     }
-		//console.log(transpt.x + " " + transpt.y);
 		ctx.fillStyle = currenttransfers[i].color;
 		ctx.beginPath();
 		ctx.arc(transpt.x, transpt.y, transRadius, 0, 2*Math.PI, false);
@@ -371,7 +372,6 @@ updateState = function() {
 			}
 		}
 		if(!found) {
-      window.console.log(file);
 			addFile(file.name, file.size, file_id, file.num_blocks, file.blocks.length);
 		}
 	}
@@ -380,24 +380,21 @@ updateState = function() {
 	for(var i = 0; i < currenttransfers.length; i++) {
 		var t = currenttransfers[i];
 		var found = false;
-		for (var userid in state.transfers) {
-			var trans = state.transfers[userid].send_block;
-			if (t.uid == userid && t.file_id == trans.file_id) {
-				found = true;
-				break;
-			}
-			trans = state.transfers[userid].rec_block;
-			if (t.uid == userid && t.file_id == trans.file_id) {
-				found = true;
-				break;
-			}
-		}
-		if (found) {
-      console.log('continuing transfer', t);
+    for (var userid in state.transfers) {
+      var trans = state.transfers[userid].send_block;
+      if (t.uid == userid && t.file_id == trans.file_id) {
+        found = true;
+        break;
+      }
+      trans = state.transfers[userid].rec_block;
+      if (t.uid == userid && t.file_id == trans.file_id) {
+        found = true;
+        break;
+      }
+    }
+		if (found || !t.loopedonce) {
 			newtransfers.push(t);
 		} else {
-      console.log('removing transfer', t);
-      console.log('wasn\'t found in transfers: ');
       console.log(state.transfers);
     }
 	}
@@ -407,25 +404,16 @@ updateState = function() {
     var found = false;
     var trans = state.transfers[userid].send_block;
 
-    // what the fuck is a chunk id your mom
-
-    //console.log("trans=");
-    //console.log(trans);
-
 		if (trans.file_id != '') {
     	for (var i = 0; i < length; i++) {
     		var t = currenttransfers[i];
 
-        //console.log("t = ");
-        //console.log(t);
     	  if (t.uid == userid && t.file_id == trans.file_id) {
     	    found = true;
     	    break;
     	  }
 			}
 			if (!found) {
-        console.log(trans);
-        //console.log("1) calling addTransfer: " + trans + ", " + trans.file_id + ", " + trans.chunkid);
         addTransfer(userid, trans.file_id, false);
       }
 		}
@@ -440,29 +428,21 @@ updateState = function() {
     	  }
     	}
     	if (!found) {
-        //console.log(trans);
-        //console.log("2) calling addTransfer: " + trans + ", " + trans.file_id + ", " + trans.block);
         addTransfer(userid, trans.file_id, true);
       }
 		}
   }
+  if (state.uploaded != undefined) {
+    for (var i = 0; i < state.uploaded.length; i++) {
+      addTransfer(state.uploaded[i].user_id, state.uploaded[i].file_id, false);
+    }
+    state.uploaded = [];
+  }
 	// call calvin's function to update progress bars
 	displayProgress(fileNodes);
   if (fileNodes.length > 0 && printed == false) {
-    console.log(state);
-    console.log('fileNodes = ');
-    console.log(fileNodes);
-    console.log('userNodes = ');
-    console.log(userNodes);
-    console.log('transfers = ');
-    console.log(currenttransfers);
     printed = true;
   }
-  /*if (fileNodes.length > 0 && fileNodes[0].name == undefined) {
-    console.log('bad file');
-  } else {
-    console.log(fileNodes[0]);
-  }*/
 };
 
 init = function() {
