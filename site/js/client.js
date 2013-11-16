@@ -16,8 +16,9 @@ peer.on('open', function(id) {
   me = id;
   state.others.push(me);
 });
+peer.on('connection', addConnection);
 
-var BLOCK_SIZE = 4096;
+var BLOCK_SIZE = 512;
 
 var state = {
   others: [],
@@ -42,6 +43,7 @@ function masterStart(filesToUpload) {
     return;
   }
   registerRoom().then(function(room_id) {
+    console.log("id=", room_id);
     var file_registrations = [];
     for (var i = 0; i < filesToUpload.length; i++) {
       file_registrations.push(registerFile(room_id, filesToUpload[i]));
@@ -58,9 +60,9 @@ function registerFile(room_id, file) {
   $.post(API_HOST + '/new_file', {
     size: Math.ceil(file.size / BLOCK_SIZE),
     room_id: room_id,
-    peer_id: me
+    peer_id: me,
+    type: file.type
   }, function(file_id) {
-    console.log("should be file_id", file_id);
     masterAddedFile(file, file_id);
     deferred.resolve();
   });
@@ -70,7 +72,6 @@ function registerFile(room_id, file) {
 function registerRoom() {
   var deferred = $.Deferred();
   $.post(API_HOST + '/new_room', function(data) {
-    console.log("should be room_id", data);
     deferred.resolve(data);
   });
   return deferred;
@@ -79,7 +80,6 @@ function registerRoom() {
 function informServer(file_id, block_num) {
   $.post(API_HOST + "/update/" + file_id, {peer_id: me, block_id: block_num}, function(data) {
     // Don't really care about a response
-    console.log("update response: ", data);
   });
 }
 
@@ -98,7 +98,6 @@ function getParticipants() {
     return;
   }
   $.get(API_HOST + "/subscribe/" + file_id + "?peer_id=" + me, function(data) {
-    console.log("should be an array of peers", data);
     addNewPeers(data);
     getParticipants();
   });
@@ -126,24 +125,33 @@ function addNewPeers(new_peers) {
   }
 }
 
-function addPeer(peer_id) {
-  state.others.push(p);
-  if (!state.other_states[p]) {
-    state.other_states[p] = [];
+function addConnection(conn) {
+  if (state.others.indexOf(conn.peer) != -1) {
+    return;
   }
-  connections[peer] = {};
+  addPeerConn(conn);
+}
+
+function addPeerConn(conn) {
+  connections[conn.peer] = conn;
+  console.log(me, "established a message connection with", conn.peer);
+  conn.on('data', processMessage);
+  state.others.push(conn.peer);
+  sendFileDescriptors(conn.peer);
+}
+
+function addPeer(peer_id) {
+  state.others.push(peer_id);
+  if (!state.other_states[peer_id]) {
+    state.other_states[peer_id] = {};
+  }
+  connections[peer_id] = undefined;
   var message_conn = peer.connect(peer_id);
-  message_conn.open('open', function() {
+  message_conn.on('open', function() {
+    connections[peer_id] = message_conn;
+    console.log(me, "established a message connection with", peer_id);
     message_conn.on('data', processMessage);
-    connections[peer].message = message_conn;
-    if (me == master) {
-      sendFileDescriptors(peer);
-    }
-  });
-  var data_conn = peer.connect(peer_id);
-  data_conn.open('open', function() {
-    data_conn.on('data', processData);
-    connections[peer].data = data_conn;
+    sendFileDescriptors(peer_id);
   });
 }
 
@@ -167,9 +175,9 @@ function updateOtherState() {
       return;
     }
     $.get(API_HOST + "/files/" + global_room_id, function(data) {
-      console.log("got /files", data);
+      console.log("got files", data);
       for (var i = 0; i < data.length; i++) {
-        state.files[data[i]] = {};
+        state.files[data[i]] = {blocks: []};
       }
       updateOtherState();
     });
@@ -177,21 +185,28 @@ function updateOtherState() {
   }
   for (var file_id in state.files) {
     if (state.files.hasOwnProperty(file_id)) {
-      // fire off ajax request
-      $.get(API_HOST + "/status/" + file_id, function(data) {
-        console.log("we got some new state: ");
-        console.log(data);
-        addNewPeersFromNewState(data);
-        updateFileState(file_id, data);
-        console.log("New state object", state);
-      });
+      fireUpdateFileStateRequest(file_id);
     }
   }
 }
 
+function fireUpdateFileStateRequest(file_id) {
+  $.get(API_HOST + "/status/" + file_id, function(data) {
+    addNewPeersFromNewState(data);
+    updateFileState(file_id, data);
+  });
+}
+
 function updateFileState(file_id, data) {
-  for (var peer_id in state.others) {
-    state.other_states[peer_id] = data[peer_id];
+  for (var i = 0; i < state.others.length; i++) {
+    var peer_id = state.others[i];
+    if (peer_id == me) {
+      continue;
+    }
+    if (!state.other_states[peer_id]) {
+      state.other_states[peer_id] = {};
+    }
+    state.other_states[peer_id][file_id] = data[peer_id];
   }
 }
 
@@ -207,44 +222,34 @@ function masterAddedFile(file, file_id) {
     name: file.name,
     size: file.size,
     num_blocks: n,
-    blocks: blocks
+    blocks: blocks,
+    type: file.type
   };
-  console.log(state);
+  finished_files[file_id] = true;
 }
+
+var DELAY = 120
 
 // Sends a message to another user
 function sendMessage(message, rec) {
   message.sender = me;
-  connections[rec].message.send(message);
-}
-
-// Used for sending data to another user
-function sendData(message, rec) {
-  message.sender = me;
-  connections[rec].data.send(message);
+  setTimeout(function() {
+    connections[rec].send(message);
+  }, DELAY);
 }
 
 function processMessage(message) {
   var sender = message.sender;
   if (message.type == message_types.RES_FILES) {
-    master = sender;
     addFiles(message.data);
-  } else if (message.type = message_types.REQ_BLOCK) {
+  } else if (message.type == message_types.REQ_BLOCK) {
     sendBlock(message.file_id, message.block_num, sender)
-  } else {
-    console.log("unrecognized message received", message);
-  }
-}
-
-// save this chunk
-function processData(message) {
-  var sender = message.sender;
-  if (message.type == message_types.RES_BLOCK) {
+  } else if (message.type == message_types.RES_BLOCK) {
     if (hasBlock(message.file_id, message.block_num)) {
       // Already have this block fool
       return;
     }
-    writeBlock(message.file_id, message.block_num, message.data, sender);
+    writeBlock(message.file_id, message.block_num, message.data, message.data_type, sender);
   } else {
     console.log("unrecognized data message received", message);
   }
@@ -259,8 +264,13 @@ function sendFileDescriptors(rec) {
   var files_to_send = {};
   for (var f in state.files) {
     if (state.files.hasOwnProperty(f)) {
-      files_to_send[f] = state.files[f];
+      var thisFile = state.files[f];
+      files_to_send[f] = {};
+      files_to_send[f].name = thisFile.name;
+      files_to_send[f].size = thisFile.size;
+      files_to_send[f].num_blocks = thisFile.num_blocks;
       files_to_send[f].blocks = [];
+      files_to_send[f].type = thisFile.type;
     }
   }
   var message = {
@@ -274,8 +284,8 @@ function sendFileDescriptors(rec) {
 function addFiles(descripts) {
   for (var f in descripts) {
     if (descripts.hasOwnProperty(f)) {
-      if (!state.files[f]) {
-        state.files[f] = descripts;
+      if (!state.files[f] || !state.files[f].name) {
+        state.files[f] = descripts[f];
       }
     }
   }
@@ -283,6 +293,9 @@ function addFiles(descripts) {
 
 function refreshPeers() {
   for (var i = 0; i < state.others.length; i++) {
+    if (state.others[i] == me) {
+      continue;
+    }
     updatePeer(state.others[i]);
   }
 }
@@ -294,11 +307,20 @@ function updatePeer(peer_id) {
       rec_block: {file_id: "", block: -1}
     };
   }
-  if (state.transfers[peer_id].rec_block == -1) {
+  if (!state.transfers[peer_id]) {
+    return;
+  }
+  if (state.transfers[peer_id].rec_block.block == -1 && state.transfers[peer_id].send_block.block == -1) {
     var things_to_req = [];
     for (var file_id in state.files) {
       if (state.files.hasOwnProperty(file_id)) {
-        var list = state.other_states[peer_id];
+        if (!state.other_states[peer_id] || finished_files[file_id]) {
+          continue;
+        }
+        var list = state.other_states[peer_id][file_id];
+        if (!list) {
+          continue;
+        }
         for (var i = 0; i < list.length; i++) {
           if (state.files[file_id].blocks.indexOf(list[i]) == -1) {
             // We don't have it and they do
@@ -339,7 +361,8 @@ function checkDoneWithFile(file_id) {
 }
 
 // Called by the client to write the files to the filesystem
-function writeBlock(file_id, block_num, data, sender) {
+function writeBlock(file_id, block_num, data, type, sender) {
+  data = new Blob([data], {type: type});
   var filename = getFileName(file_id, block_num);
   fs.root.getFile(filename, {create: true}, function(fileEntry) {
     fileEntry.createWriter(function(fileWriter) {
@@ -364,8 +387,7 @@ function readBlockDeferred(file_id, block_num) {
     fileEntry.file(function(file) {
       var reader = new FileReader();
       reader.onloadend = function(evt) {
-        finished_files[file_id][block_num] =
-          new Blob([evt.target.result]);
+        finished_files[file_id][block_num] = evt.target.result;
         deferred.resolve();
       };
       reader.readAsArrayBuffer(file);
@@ -388,10 +410,8 @@ function combine(file_id) {
       delete finished_files[file_id][i];
     }
     finished_files[file_id] = true;
-    saveAs(fullFile, state.files[file_id].name);
+    saveAs(new Blob(fullFile), state.files[file_id].name);
     fullFile.length = 0;
-  }, function(err) {
-    console.log("Uh oh, ran into error loading a block", err);
   });
 }
 
@@ -413,7 +433,7 @@ function updateBlockReceiving(file_id, block_num, peer_id) {
     };
   }
   state.transfers[peer_id].rec_block.file_id = file_id;
-  state.transfers[peer_id].rec_block.block_num = block_num;
+  state.transfers[peer_id].rec_block.block = block_num;
 }
 
 function updateBlockSending(file_id, block_num, peer_id) {
@@ -424,7 +444,7 @@ function updateBlockSending(file_id, block_num, peer_id) {
     };
   }
   state.transfers[peer_id].send_block.file_id = file_id;
-  state.transfers[peer_id].send_block.block_num = block_num;
+  state.transfers[peer_id].send_block.block = block_num;
 }
 
 function sendBlock(file_id, block_num, rec) {
@@ -442,18 +462,19 @@ function sendSlicedBlock(file_id, block_num, rec) {
   var reader = new FileReader();
   reader.onloadend = function(evt) {
     if (evt.target.readyState == FileReader.DONE) {
-      var newBlob = new Blob([evt.target.result], {type: "audio/wav"});
+      var newBlob = new Blob([evt.target.result], {type: file.type});
       var m = {
         file_id: file_id,
         type: message_types.RES_BLOCK,
         block_num: block_num,
-        data: newBlob
+        data: newBlob,
+        data_type: file.type
       };
-      sendData(m, rec);
+      sendMessage(m, rec);
       updateBlockSending("", -1, rec);
     }
   };
-  var lim = Math.min((block_num + 1) * BLOCK_SIZE, state.files[file_id].size);
+  var lim = Math.min((block_num + 1) * BLOCK_SIZE, file.size);
   var blob = file.slice(block_num * BLOCK_SIZE, lim);
   reader.readAsArrayBuffer(blob);
 }
@@ -464,17 +485,54 @@ function sendFSBlock(file_id, block_num , rec) {
     fileEntry.file(function(file) {
       var reader = new FileReader();
       reader.onloadend = function(evt) {
-        var newBlob = new Blob([evt.target.result], {type: "audio/wav"});
+        var newBlob = new Blob([evt.target.result], {type: file.type});
         var m = {
           file_id: file_id,
           type: message_types.RES_BLOCK,
           block_num: block_num,
-          data: newBlob
+          data: newBlob,
+          data_type: file.type
         };
-        sendData(m, rec);
+        sendMessage(m, rec);
         updateBlockSending("", -1, rec);
       };
       reader.readAsArrayBuffer(file);
     });
   });
 }
+
+window.requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
+var fs = null;
+
+function errorHandler(e) {
+  var msg = '';
+  switch (e.code) {
+    case FileError.QUOTA_EXCEEDED_ERR:
+      msg = 'QUOTA_EXCEEDED_ERR';
+      break;
+    case FileError.NOT_FOUND_ERR:
+      msg = 'NOT_FOUND_ERR';
+      break;
+    case FileError.SECURITY_ERR:
+      msg = 'SECURITY_ERR';
+      break;
+    case FileError.INVALID_MODIFICATION_ERR:
+      msg = 'INVALID_MODIFICATION_ERR';
+      break;
+    case FileError.INVALID_STATE_ERR:
+      msg = 'INVALID_STATE_ERR';
+      break;
+    default:
+      msg = 'Unknown Error';
+      break;
+  }
+  document.querySelector('#example-list-fs-ul').innerHTML = 'Error: ' + msg;
+}
+
+function initFS() {
+  window.requestFileSystem(window.TEMPORARY, 2*1024*1024*1024, function(filesystem) {
+    fs = filesystem;
+  }, errorHandler);
+}
+
+initFS();

@@ -150,6 +150,8 @@ function clientStartLoops() {
     window.setInterval(function() {
         updateOtherState();
     }, 1000);
+
+    window.getParticipants();
 }
 
 // run on load only
