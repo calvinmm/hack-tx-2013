@@ -1,10 +1,17 @@
 Proposed API
 ============
 
+* > POST /new_room
+  Creates a new room.
+  Returns room_id
+
 * > POST /new_file
-  > Data: size=Number of blocks in file
-  Creates a new file object, with given number of blocks
+  > Data: size=Number of blocks in file, room_id
+  Creates a new file object in the given room, with given number of blocks
   Returns a file_id
+
+* > GET /files/room_id
+  Returns a JSON list of file_ids
 
 * > GET /subscribe/file_id?peer_id=peerid
   Longpolling, returns a peer id when a new peer connects for the file.

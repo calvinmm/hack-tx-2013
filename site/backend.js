@@ -77,6 +77,14 @@ function add_peer(file_id, peer_id) {
                [peer_id, file_id]);
 }
 
+function add_file(size, room_id) {
+  return query('INSERT INTO files (size, room_id)' +
+               'VALUES ($1, $2) RETURNING file_id', [size, room_id])
+  .then(function(result) {
+    return result.rows[0].file_id;
+  });
+}
+
 Q.ninvoke(client, "connect").then(
   function() {
 
@@ -85,12 +93,11 @@ Q.ninvoke(client, "connect").then(
 
     app.post('/new_file', function(req, res) {
       var size = parseInt(req.body.size);
-      query('INSERT INTO files (size) VALUES ($1) RETURNING file_id', [size])
-        .then(
-          function(result) {
-            var file_id = result.rows[0].file_id;
-            res.send(file_id.toString());
-          }
+      var room_id = parseInt(req.body.room_id);
+      add_file(size, room_id).then(
+        function(file_id) {
+          res.send(file_id);
+        }
       ).catch(
         function(err) {
           console.err('Error creating file', err);
