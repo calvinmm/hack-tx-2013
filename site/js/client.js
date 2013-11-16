@@ -22,7 +22,7 @@ peer.on('open', function(id) {
 });
 peer.on('connection', addConnection);
 
-var BLOCK_SIZE = 512;
+var BLOCK_SIZE = 4096;
 
 var state = {
   others: [],
@@ -233,25 +233,17 @@ function masterAddedFile(file, file_id) {
   finished_files[file_id] = true;
 }
 
-var DELAY = 120;
+var DELAY = 0;
 
 // Sends a message to another user
 function sendMessage(message, rec) {
   message.sender = me;
   setTimeout(function() {
-    //console.log(connections);
-    //console.log(connections[rec]);
-    //console.log(rec);
-    try {
+    if (connections[rec] === undefined) {
+      // Retry if other user hasn't connected yet
+      sendMessage(message, rec);
+    } else {
       connections[rec].send(message);
-    } catch (e) {
-      // we need to realize that we failed to send and do the right thing
-      if (message.type == message_types.REQ_BLOCK) {
-        updateBlockReceiving("", -1, rec);
-      } else if (message.type == message_types.RES_BLOCK) {
-        updateBlockSending("", -1, rec);
-      }
-      console.log("failed to send message", message, "to", rec, "error:", e);
     }
   }, DELAY);
 }
@@ -261,7 +253,7 @@ function processMessage(message) {
   if (message.type == message_types.RES_FILES) {
     addFiles(message.data);
   } else if (message.type == message_types.REQ_BLOCK) {
-    sendBlock(message.file_id, message.block_num, sender)
+    sendBlock(message.file_id, message.block_num, sender);
   } else if (message.type == message_types.RES_BLOCK) {
     if (hasBlock(message.file_id, message.block_num)) {
       // Already have this block fool
@@ -274,7 +266,7 @@ function processMessage(message) {
 }
 
 function hasBlock(file_id, block_num) {
-  return state.files[file_id].blocks.indexOf(block_num) != -1
+  return state.files[file_id].blocks.indexOf(block_num) != -1;
 }
 
 // Sends the file descriptions we know of to rec
@@ -394,6 +386,7 @@ function checkDoneWithFile(file_id) {
 
 // Called by the client to write the files to the filesystem
 function writeBlock(file_id, block_num, data, type, sender) {
+  var starttime = new Date();
   data = new Blob([data], {type: type});
   var filename = getFileName(file_id, block_num);
   fs.root.getFile(filename, {create: true}, function(fileEntry) {
@@ -517,12 +510,12 @@ function sendFSBlock(file_id, block_num , rec) {
     fileEntry.file(function(file) {
       var reader = new FileReader();
       reader.onloadend = function(evt) {
-        var newBlob = new Blob([evt.target.result], {type: file.type});
+        //var newBlob = new Blob([evt.target.result], {type: file.type});
         var m = {
           file_id: file_id,
           type: message_types.RES_BLOCK,
           block_num: block_num,
-          data: newBlob,
+          data: evt.target.result,
           data_type: file.type
         };
         sendMessage(m, rec);
