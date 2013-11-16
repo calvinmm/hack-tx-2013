@@ -77,10 +77,77 @@ var state = {
 		}
 	}
 };
-// name, size, num_blocks, blocks[]
 
-//xfers
-//uid: {send_block/rec_block : {fileid: , block: (-1 none)}}
+var deltastate = {
+	others: ['user1', 'user4', 'user2', 'userQ', 'user3'],
+	other_state: {
+		user1: {
+			file1: [1, 2, 5, 6],
+			file2: [1, 3]
+		},
+		user2: {
+			file1 : [2, 6],
+			file3: [2, 4]
+		},
+		user3: {
+			file4: [1, 2, 3]
+		},
+		// me
+		user4: {
+			file1: [3, 4],
+			file2: [2, 4],
+			file4: [4, 5]
+		}
+	},
+	files : {
+		file1: {
+			name: "doge.txt",
+			size: 1025,
+			num_blocks: 6,
+			blocks: [3, 4, 5, 6]
+		},
+		file2: {
+			name: "poop.gif",
+			size: 69,
+			num_blocks: 4,
+			blocks: [1, 2, 4]
+		},
+		file3: {
+			name: "hack.jar",
+			size: 1337,
+			num_blocks: 3,
+			blocks: [1]
+		},
+		file4: {
+			name: "file4",
+			size: 4,
+			num_blocks: 5,
+			blocks: [1, 4, 5]
+		}
+	},
+	transfers: {
+		user1: {
+			send_block: {
+				fileid: 'file2',
+				block: 3
+			},
+			rec_block: {
+				fileid: '',
+				block: -1
+			}
+		},
+		user2: {
+			send_block: {
+				fileid: 'file3',
+				block: 4
+			},
+			rec_block: {
+				fileid: '',
+				block: -1
+			}
+		}
+	}
+};
 
 // points
 var userNodes = [];
@@ -439,13 +506,13 @@ updateState = function() {
 	// don't need the info on each user in other_state
 	
 	// parse files to see how much of each file you have
-	for (fileid in state.files) {
+	for (var fileid in state.files) {
 		var file = state.files[fileid];
 		var found = false;	
 		for (var i = 0; i < fileNodes.length; i++) {
 			if (fileNodes[i].id == fileid) {
 				// update this dude
-				fileNodes[i].curblocks = file.blocks.length;
+				fileNodes[i].curchunks = file.blocks.length;
 				found = true;
 				break;
 			}
@@ -459,7 +526,7 @@ updateState = function() {
 	for(var i = 0; i < currenttransfers.length; i++) {
 		var t = currenttransfers[i];
 		var found = false;
-		for (userid in state.transfers) {
+		for (var userid in state.transfers) {
 			var trans = state.transfers[userid].send_block;
 			if (t.id == userid && t.fileid == trans.fileid && t.chunk == trans.block && !t.down) {
 				found = true;
@@ -477,7 +544,7 @@ updateState = function() {
 	}
 	currenttransfers = newtransfers;
 	var length = currenttransfers.length; // don't need to check ones we add in here
-	for(userid in state.transfers) {
+	for(var userid in state.transfers) {
     var found = false;
     var trans = state.transfers[userid].send_block;
 		if (trans.fileid!= '') {
@@ -504,8 +571,13 @@ updateState = function() {
 		}
   }
 	// call calvin's function to update progress bars
-	displayProgress(fileNodes);
+	//displayProgress(fileNodes);
 };
+
+testDeltaState = function() {
+	state = deltastate;
+	updateState();
+}
 
 init = function() {
 	center = new Point(width / 2, height / 2);
@@ -522,6 +594,8 @@ init = function() {
 	
 	
 	setTimeout(loop, 10);
+	
+	//setTimeout(testDeltaState, 12000);
 };
 
 poll = function() {
