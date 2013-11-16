@@ -10,20 +10,19 @@ var userNodes = [];
 var fileNodes = [];
 
 var center = undefined;
-var user_radius = 200;
-var file_radius = 30;
+var radius = 180;
 
 var userNodeRadius = 12;
 
-var fileNodeRadius = 20;
+var fileNodeRadius = 100;
 var transRadius = 6;
 
-var transferSpeed = 10;
+var transferSpeed = 7;
 
 var currenttransfers = [];
 
-var user_head = undefined;
-var file_head = undefined;
+var head = undefined;
+var totalFileChunks = 0;
 
 // ms per frame
 var ms = 25;
@@ -31,7 +30,6 @@ var ms = 25;
 // drawing styles
 var backgroundStyle = "#FFFFFF";
 var lineStyle = "#000000";
-var transStyle = "#00FF00";
 var fileStyle = "#BB4F00";
 var fileProgressStyle = "#FF7F00";
 var fileStrokeStyle = "#882C00";
@@ -55,12 +53,10 @@ ListNode.prototype.split = function() {
 	this.next = newnode;
 };
 
-nextPoint = function(head, is_user) {
+nextPoint = function() {
 	var bestAngle = 0;
 	if (head == undefined) {
 		head = new ListNode(2 * Math.PI);
-		if (is_user) user_head = head;
-		else file_head = head;
 	} else {
 		var maxAngle = 0;
 		var bestNode = undefined;
@@ -79,29 +75,25 @@ nextPoint = function(head, is_user) {
 	}
 	bestAngle = Math.PI - bestAngle; // want 0 to be at 180 (first node is on left) and clockwise around
   // extend radius if would cause collisions
-	var radius = (is_user) ? user_radius : file_radius;
-	var node_rad = (is_user) ? user_radius : file_radius;
-	if (2 * node_rad > radius * maxAngle) {
-		radius += node_rad;
-		if (is_user) user_radius = radius;
-		else file_radius = radius;
+	if (userNodeRadius > radius * maxAngle) {
+		radius += userNodeRad;
 	}
 	return new Point(center.x + radius * Math.cos(bestAngle), center.y + radius * Math.sin(bestAngle));
 };
 
 // Want to add you first, host second
 addUser = function(userid) {
-	var me = true;
-	var host = false;
-	if (undefined != user_head) me = false;
-	if (undefined != user_head && undefined != user_head.next) {
+	var host = true;
+	if (undefined != head && undefined != head.next) {
 		host = false;
 	}
-	userNodes.push(new UserNode(nextPoint(user_head, true), userid, me, host));
+	userNodes.push(new UserNode(nextPoint(), userid, host));
 };
 
 addFile = function(fileid) {
-	fileNodes.push(new FileNode(nextPoint(file_head, false), fileid, 10 /*use fileid to get number of chunks?*/));
+	var numchunks = 10 + Math.floor(Math.random() * 20);
+	fileNodes.push(new FileNode(fileid, numchunks /*use fileid to get number of chunks?*/));
+	totalFileChunks += numchunks;
 };
 
 
@@ -119,8 +111,6 @@ function Link(a, b) {
 	var dx = a.x - b.x;
 	var dy = a.y - b.y;
 	this.len = Math.sqrt(dx * dx + dy * dy);
-	window.console.log(this.len);
-	window.console.log(this.getPoint());
 };
 
 Link.prototype.update = function(distToMove) {
@@ -141,39 +131,30 @@ Link.prototype.reset = function() {
 	this.u = 0.0;
 };
 
-addTransfer = function(aid, bid, fileid, chunkid) {
-	var anode = undefined;
-	if (aid != undefined) {
+addTransfer = function(userid, fileid, chunkid, downloading) {
+	var unode = undefined;
+	if (userid != undefined) {
 		for (var i = 0; i < userNodes.length; i++) {
-			if (userNodes[i].id == aid) {
-				anode = userNodes[i];
-				break;
-			}
-		}
-	}
-	var bnode = undefined;
-	if (bid != undefined) {
-		for (var i = 0; i < userNodes.length; i++) {
-			if (userNodes[i].id == bid) {
-				bnode = userNodes[i];
+			if (userNodes[i].id == userid) {
+				unode = userNodes[i];
 				break;
 			}
 		}	
 	}
 	var fnode = undefined;
-	for (var i = 0; i < userNodes.length; i++) {
+	for (var i = 0; i < fileNodes.length; i++) {
 		if (fileNodes[i].id == fileid) {
 			fnode = fileNodes[i];
 			break;
 		}
 	}
-	currenttransfers.push( new Transfer((anode == undefined) ? undefined : anode.point, (bnode == undefined) ? undefined : bnode.point, fnode.point, chunkid) );
+	currenttransfers.push( new Transfer(unode.point, center, downloading, userid, fileid, chunkid, fnode.filledStyle) );
 };
 
-removeTransfer = function(aid, bid, fileid, chunkid) {
+removeTransfer = function(uid, fileid, chunkid, downloading) {
   for (var i = 0; i < currenttransfers.length; i++) {
-		t = currenttransfers[i];
-		if (t.aid == aid && t.bid = bid && t.fid == fileid && t.chunk == chunkid) {
+		var t = currenttransfers[i];
+		if (t.id == uid && t.fid == fileid && t.chunk == chunkid && t.down == downloading) {
 			currenttransfers.splice(i, 1);
       break;
     }
@@ -181,42 +162,52 @@ removeTransfer = function(aid, bid, fileid, chunkid) {
 };
 
 // transferring file chunk of file pointfile from user a to user b
-function Transfer(pointa, pointb, pointfile, aid, bid, fid, cid) {
-	//this.cur = new Link(pointa, pointfile);
-	//this.next = new Link(pointfile, pointb);
-	this.cur = undefined;
-	if (pointa == undefined) {
-		this.cur = new Link(pointfile, pointb);
-	} else {
-		this.cur = new Link(pointa, pointfile);
-	}
-	this.a = pointa;
-	this.b = pointb;
-	this.f = pointfile;
+function Transfer(pointuser, pointfile, downloading, uid, fid, cid, color) {
+	this.a = (downloading) ? pointuser : pointfile;
+	this.b = (downloading) ? pointfile : pointuser;
+	this.cur = new Link(this.a, this.b);
 	// for indexing/removing transfers when the file is done
-	this.aid = aid;
-	this.bid = bid;
+	this.uid = uid;
 	this.fileid = fid;
 	this.chunkid = cid;
+	this.color = color;
 };
 
 Transfer.prototype.update = function(distToMove) {
 	var left = this.cur.update(distToMove);
 	while (left > 0) {
-		// switch and move to the new one
 		this.cur.reset();
-		//var temp = this.cur;
-		//this.cur = this.next;
-		//this.next = temp;
 		left = this.cur.update(left);
 	}
 };
 
-function FileNode(point, fileid, totchunks) {
-	this.point = point;
+randomFileStyle = function(fnode) {
+	// want random value between 20 and FF for each base color so the filled color can be slightly darker (20 darker to be exact)
+	var dec20 = 32;
+  var decFF = 255;
+	var redval = Math.floor(Math.random() * (decFF - dec20 + 1));
+	var greenval = Math.floor(Math.random() * (decFF - dec20 + 1));
+	var blueval = Math.floor(Math.random() * (decFF - dec20 + 1));
+	fnode.filledStyle = "#" + hexDig(redval / 16) + hexDig(redval % 16) + hexDig(greenval / 16) + hexDig(greenval % 16) + hexDig(blueval / 16) + hexDig(blueval % 16);
+	redval += dec20;
+	greenval += dec20;
+	blueval += dec20;
+	fnode.clearStyle = "#" + hexDig(redval / 16) + hexDig(redval % 16) + hexDig(greenval / 16) + hexDig(greenval % 16) + hexDig(blueval / 16) + hexDig(blueval % 16);
+};
+
+hexDig = function(i) {
+	i = Math.floor(i);
+	if (i < 10) return String.fromCharCode('0'.charCodeAt(0) + i);
+	else return String.fromCharCode('A'.charCodeAt(0) + (i - 10));
+};
+
+function FileNode(fileid, totchunks) {
 	this.id = fileid;
 	this.totalchunks = totchunks;
 	this.curchunks = 0;
+	this.filledStyle = undefined;
+	this.clearStyle = undefined;
+	randomFileStyle(this);
 };
 
 FileNode.prototype.progress = function() {
@@ -232,7 +223,6 @@ function UserNode(point, userid, me, host) {
 
 
 
-
 update = function() {
 	// TODO if any state changed, modify it
 	// update all transfers
@@ -241,48 +231,63 @@ update = function() {
 	}
 };
 
+drawArc = function(x, y, radius, arcstart, arcend) {
+	var delta = Math.PI / 50;
+	for (var cur = arcstart; cur < arcend; cur+=delta) {
+		var nextarc = Math.min(arcend, cur + delta);
+		ctx.beginPath();
+		ctx.moveTo(x, y);
+		ctx.lineTo(x + radius * Math.cos(cur), y + radius * Math.sin(cur));
+		ctx.lineTo(x + radius * Math.cos(nextarc), y + radius * Math.sin(nextarc));
+		ctx.lineTo(x, y);
+		ctx.fill();
+		ctx.lineWidth = 1;
+		ctx.stroke();
+	}
+};
+
 draw = function() {
 	// draw lines between nodes
 	ctx.lineWidth = 1;
 	ctx.strokeStyle = lineStyle;
-	for (var i = 0; i < fileNodes.length; i++) {
-		var filept = fileNodes[i].point;
-		for (var j = 0; j < userNodes.length; j++) {
-			userpt = userNodes[j].point;
-			ctx.beginPath();
-			ctx.moveTo(filept.x, filept.y);
-			ctx.lineTo(userpt.x, userpt.y);
-			ctx.stroke();
-		}
+	for (var j = 0; j < userNodes.length; j++) {
+		userpt = userNodes[j].point;
+		ctx.beginPath();
+		ctx.moveTo(center.x, center.y);
+		ctx.lineTo(userpt.x, userpt.y);
+		ctx.stroke();
 	}
-	ctx.lineWidth = 2;
-	ctx.fillStyle = transStyle;
+	ctx.lineWidth = 1;
 	// draw each current transfer
 	for (var i = 0; i < currenttransfers.length; i++) {
 		var transpt = currenttransfers[i].cur.getPoint();
 		//window.console.log(transpt.x + " " + transpt.y);
+		ctx.fillStyle = currenttransfers[i].color;
 		ctx.beginPath();
 		ctx.arc(transpt.x, transpt.y, transRadius, 0, 2*Math.PI, false);
 		ctx.fill();
-		ctx.stroke();
+		//ctx.stroke();
 	}
-	// draw each file node
+	// draw file node
 	ctx.strokeStyle = fileStrokeStyle;
 	ctx.lineWidth = 3;
-	for (var i = 0; i < fileNodes.length; i++) {
-		var filept = fileNodes[i].point;
-		ctx.fillStyle = fileStyle;
-		ctx.beginPath();
-    ctx.arc(filept.x, filept.y, fileNodeRadius, 0, 2 * Math.PI, false);
-    ctx.fill();
-		ctx.fillStyle = fileProgressStyle;
-		ctx.beginPath();
-		ctx.arc(filept.x, filept.y, fileNodeRadius, 0, 2 * Math.PI * fileNodes[i].progress(), false);
-		ctx.fill();
-		ctx.beginPath();
-		ctx.arc(filept.x, filept.y, fileNodeRadius, 0, 2 * Math.PI, false);
-		ctx.stroke();
+	var totalArc = 0;
+	for (var i = 0; i < fileNodes.length; i++) {	
+		var percentChunks = fileNodes[i].totalchunks / totalFileChunks;
+		var arc = Math.PI * 2 * percentChunks;
+		var filledarc = arc * fileNodes[i].progress();
+		ctx.fillStyle = fileNodes[i].clearStyle;
+		ctx.strokeStyle = fileNodes[i].clearStyle;
+		drawArc(center.x, center.y, fileNodeRadius, totalArc, totalArc + arc);
+		ctx.fillStyle = fileNodes[i].filledStyle;
+		ctx.strokeStyle = fileNodes[i].filledStyle;
+		drawArc(center.x, center.y, fileNodeRadius, totalArc, totalArc + filledarc);
+		totalArc += arc;
 	}
+	ctx.beginPath();
+	ctx.arc(center.x, center.y, fileNodeRadius, 0, 2 * Math.PI, false);
+	ctx.stroke();
+
 	// draw each user node
 	ctx.fillStyle = userStyle;
 	for (var i = 0; i < userNodes.length; i++) {
@@ -295,13 +300,6 @@ draw = function() {
 		ctx.beginPath();
 		ctx.arc(userpt.x, userpt.y, userNodeRadius, 0, 2 * Math.PI, false);
 		ctx.stroke();
-	
-		if (userNodes[i].me) {
-			ctx.strokeStyle = meStyle;
-			ctx.beginPath();
-			ctx.arc(userpt.x, userpt.y, userNodeRadius - ctx.lineWidth, 0, 2 * Math.PI, false);
-			ctx.stroke();
-		}
 	
 		if (userNodes[i].host) {
 			ctx.strokeStyle = hostStyle;
@@ -324,22 +322,40 @@ loop = function() {
 
 
 testFillChunks = function() {
-	for (var i = 0;i < fileNodes.length; i++) {
+	var i = Math.floor(Math.random() * fileNodes.length);
+	if (fileNodes[i].curchunks < fileNodes[i].totalchunks) {
 		fileNodes[i].curchunks++;
+		setTimeout(testFillChunks, 200 + Math.floor(Math.random() * 600));
+	} else {
+		setTimeout(testFillChunks, 5);
 	}
-	setTimeout(testFillChunks, 5000);
-}
+};
+
+testuserid = 15;
+testAddUser = function() {
+	addUser(testuserid++);
+	setTimeout(testAddUser, 7500);
+};
+
+testfileid = 3;
+testAddFile = function() {
+	addFile(testfileid++);
+	if (testfileid < 8) {
+		setTimeout(testAddFile);
+	}
+};
 
 init = function() {
-	center = new Point(320, 240);
+	center = new Point(width / 2, height / 2);
 	// add some stuff for testing 
 	addFile(0);
 	addUser(2);
 	addUser(12);	
-	addTransfer(12, undefined, 0, 69);
-	addTransfer(undefined, 12, 0, 69);
+	addTransfer(2, 0, 69, false);
 	setTimeout(loop, 10);
-	setTimeout(testFillChunks, 5000);
+	setTimeout(testFillChunks, 2000);
+	setTimeout(testAddUser, 8000);
+	setTimeout(testAddFile, 1);
 };
 
 init();
