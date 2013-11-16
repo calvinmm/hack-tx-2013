@@ -3,152 +3,6 @@ var width = $(visCanvas).attr("width");
 var height = $(visCanvas).attr("height");
 var ctx = c.getContext('2d');
 
-
-// set up state
-var me = 'user4';
-
-var state = {
-	others: ['user1', 'user4', 'user2', 'user3'],
-	other_state: {
-		user1: {
-			file1: [1, 2, 5, 6],
-			file2: [1, 3]
-		},
-		user2: {
-			file1 : [2, 6],
-			file3: [2, 4]
-		},
-		user3: {
-			file4: [1, 2, 3]
-		},
-		// me
-		user4: {
-			file1: [3, 4],
-			file2: [2, 4],
-			file4: [4, 5]
-		}
-	},
-	files : {
-		file1: {
-			name: "doge.txt",
-			size: 1025,
-			num_blocks: 6,
-			blocks: [3, 4]
-		},
-		file2: {
-			name: "poop.gif",
-			size: 69,
-			num_blocks: 4,
-			blocks: [2, 4]
-		},
-		file3: {
-			name: "hack.jar",
-			size: 1337,
-			num_blocks: 3,
-			blocks: []
-		},
-		file4: {
-			name: "file4",
-			size: 4,
-			num_blocks: 4,
-			blocks: [4, 5]
-		}
-	},
-	transfers: {
-		user1: {
-			send_block: {
-				fileid: '',
-				block: -1
-			},
-			rec_block: {
-				fileid: 'file1',
-				block: 2
-			}
-		},
-		user2: {
-			send_block: {
-				fileid: 'file3',
-				block: 4
-			},
-			rec_block: {
-				fileid: '',
-				block: -1
-			}
-		}
-	}
-};
-
-var deltastate = {
-	others: ['user1', 'user4', 'user2', 'userQ', 'user3'],
-	other_state: {
-		user1: {
-			file1: [1, 2, 5, 6],
-			file2: [1, 3]
-		},
-		user2: {
-			file1 : [2, 6],
-			file3: [2, 4]
-		},
-		user3: {
-			file4: [1, 2, 3]
-		},
-		// me
-		user4: {
-			file1: [3, 4],
-			file2: [2, 4],
-			file4: [4, 5]
-		}
-	},
-	files : {
-		file1: {
-			name: "doge.txt",
-			size: 1025,
-			num_blocks: 6,
-			blocks: [3, 4, 5, 6]
-		},
-		file2: {
-			name: "poop.gif",
-			size: 69,
-			num_blocks: 4,
-			blocks: [1, 2, 4]
-		},
-		file3: {
-			name: "hack.jar",
-			size: 1337,
-			num_blocks: 3,
-			blocks: [1]
-		},
-		file4: {
-			name: "file4",
-			size: 4,
-			num_blocks: 5,
-			blocks: [1, 4, 5]
-		}
-	},
-	transfers: {
-		user1: {
-			send_block: {
-				fileid: 'file2',
-				block: 3
-			},
-			rec_block: {
-				fileid: '',
-				block: -1
-			}
-		},
-		user2: {
-			send_block: {
-				fileid: 'file3',
-				block: 4
-			},
-			rec_block: {
-				fileid: '',
-				block: -1
-			}
-		}
-	}
-};
-
 // points
 var userNodes = [];
 var fileNodes = [];
@@ -230,8 +84,8 @@ addUser = function(userid, host) {
 	userNodes.push(new UserNode(nextPoint(), userid, host));
 };
 
-addFile = function(name, size, fileid, numchunks, curchunks) {
-	fileNodes.push(new FileNode(name, size, fileid, numchunks, curchunks));
+addFile = function(name, size, file_id, numchunks, curchunks) {
+	fileNodes.push(new FileNode(name, size, file_id, numchunks, curchunks));
 	totalFileChunks += numchunks;
 };
 
@@ -270,7 +124,10 @@ Link.prototype.reset = function() {
 	this.u = 0.0;
 };
 
-addTransfer = function(userid, fileid, chunkid, downloading) {
+addTransfer = function(userid, file_id, chunkid, downloading) {
+
+  console.log("looking for " + file_id);
+
 	var unode = undefined;
 	if (userid != undefined) {
 		for (var i = 0; i < userNodes.length; i++) {
@@ -282,18 +139,21 @@ addTransfer = function(userid, fileid, chunkid, downloading) {
 	}
 	var fnode = undefined;
 	for (var i = 0; i < fileNodes.length; i++) {
-		if (fileNodes[i].id == fileid) {
+    console.log(fileNodes[i].id);
+		if (fileNodes[i].id == file_id) {
 			fnode = fileNodes[i];
 			break;
 		}
 	}
-	currenttransfers.push( new Transfer(unode.point, center, downloading, userid, fileid, chunkid, fnode.filledStyle) );
+
+  // this has a bug, fnode is null?
+	currenttransfers.push( new Transfer(unode.point, center, downloading, userid, file_id, chunkid, fnode.filledStyle) );
 };
 
-removeTransfer = function(uid, fileid, chunkid, downloading) {
+removeTransfer = function(uid, file_id, chunkid, downloading) {
   for (var i = 0; i < currenttransfers.length; i++) {
 		var t = currenttransfers[i];
-		if (t.id == uid && t.fid == fileid && t.chunk == chunkid && t.down == downloading) {
+		if (t.id == uid && t.fid == file_id && t.chunk == chunkid && t.down == downloading) {
 			currenttransfers.splice(i, 1);
       break;
     }
@@ -307,7 +167,7 @@ function Transfer(pointuser, pointfile, downloading, uid, fid, cid, color) {
 	this.cur = new Link(this.a, this.b);
 	// for indexing/removing transfers when the file is done
 	this.uid = uid;
-	this.fileid = fid;
+	this.file_id = fid;
 	this.chunkid = cid;
 	this.color = color;
 };
@@ -340,10 +200,10 @@ hexDig = function(i) {
 	else return String.fromCharCode('A'.charCodeAt(0) + (i - 10));
 };
 
-function FileNode(name, size, fileid, totchunks, curchunks) {
+function FileNode(name, size, file_id, totchunks, curchunks) {
 	this.name = name;
 	this.size = size;
-	this.id = fileid;
+	this.id = file_id;
 	this.totalchunks = totchunks;
 	this.curchunks = (undefined == curchunks) ? 0 : curchunks;
 	this.filledStyle = undefined;
@@ -364,6 +224,7 @@ function UserNode(point, userid, host) {
 
 
 update = function() {
+  updateState();
 	// TODO if any state changed, modify it
 	// update all transfers
 	for (var i = 0; i < currenttransfers.length; i++) {
@@ -471,20 +332,6 @@ testFillChunks = function() {
 	}
 };
 
-testuserid = 15;
-testAddUser = function() {
-	addUser(testuserid++);
-	setTimeout(testAddUser, 800);
-};
-
-testfileid = 3;
-testAddFile = function() {
-	addFile(testfileid++);
-	if (testfileid < 8) {
-		setTimeout(testAddFile);
-	}
-};
-
 updateState = function() {
 	// go through users to see if need to add any of users
 	var user_list = state.others;
@@ -506,11 +353,11 @@ updateState = function() {
 	// don't need the info on each user in other_state
 	
 	// parse files to see how much of each file you have
-	for (var fileid in state.files) {
-		var file = state.files[fileid];
+	for (var file_id in state.files) {
+		var file = state.files[file_id];
 		var found = false;	
 		for (var i = 0; i < fileNodes.length; i++) {
-			if (fileNodes[i].id == fileid) {
+			if (fileNodes[i].id == file_id) {
 				// update this dude
 				fileNodes[i].curchunks = file.blocks.length;
 				found = true;
@@ -518,7 +365,7 @@ updateState = function() {
 			}
 		}
 		if(!found) {
-			addFile(file.name, file.size, fileid, file.num_blocks, file.blocks.length);
+			addFile(file.name, file.size, file_id, file.num_blocks, file.blocks.length);
 		}
 	}
 	// tricky part: remove all old transfers that are not in the new state, then add all new ones that are not in the old state
@@ -528,12 +375,12 @@ updateState = function() {
 		var found = false;
 		for (var userid in state.transfers) {
 			var trans = state.transfers[userid].send_block;
-			if (t.id == userid && t.fileid == trans.fileid && t.chunk == trans.block && !t.down) {
+			if (t.id == userid && t.file_id == trans.file_id && t.chunk == trans.block && !t.down) {
 				found = true;
 				break;
 			}
 			trans = state.transfers[userid].rec_block;
-			if (t.id == userid && t.fileid == trans.fileid && t.chunk == trans.block && t.down) {
+			if (t.id == userid && t.file_id == trans.file_id && t.chunk == trans.block && t.down) {
 				found = true;
 				break;
 			}
@@ -547,55 +394,55 @@ updateState = function() {
 	for(var userid in state.transfers) {
     var found = false;
     var trans = state.transfers[userid].send_block;
-		if (trans.fileid!= '') {
+
+    // what the fuck is a chunk id
+
+    console.log("trans=");
+    console.log(trans);
+
+		if (trans.file_id != '') {
     	for (var i = 0; i < length; i++) {
     		var t = currenttransfers[i];
-    	  if (t.id == userid && t.fileid == trans.fileid && t.chunk == trans.block && !t.down) {
+        console.log("t = ");
+        console.log(t);
+    	  if (t.id == userid && t.file_id == trans.file_id && t.chunk == trans.block && !t.down) {
     	    found = true;
     	    break;
     	  }
 			}
-			if (!found) addTransfer(userid, trans.fileid, trans.chunkid, false);
+			if (!found) {
+        console.log(trans);
+        console.log("1) calling addTransfer: " + trans + ", " + trans.file_id + ", " + trans.chunkid);
+        addTransfer(userid, trans.file_id, trans.chunkid, false);
+      }
 		}
     trans = state.transfers[userid].rec_block;
 		found = false;
-		if (trans.fileid != '') {
+		if (trans.file_id != '') {
 			for (var i = 0; i < length; i++) {
 				var t = currenttransfers[i];
-    	  if (t.id == userid && t.fileid == trans.fileid && t.chunk == trans.block && t.down) {
+    	  if (t.id == userid && t.file_id == trans.file_id && t.chunk == trans.block && t.down) {
     	    found = true;
     	    break;
     	  }
     	}
-    	if (!found) addTransfer(userid, trans.fileid, trans.block, true);
+    	if (!found) {
+        console.log(trans);
+        console.log("2) calling addTransfer: " + trans + ", " + trans.file_id + ", " + trans.block);
+        addTransfer(userid, trans.file_id, trans.block, true);
+      }
 		}
   }
 	// call calvin's function to update progress bars
 	displayProgress(fileNodes);
 };
 
-testDeltaState = function() {
-	state = deltastate;
-	updateState();
-}
-
 init = function() {
 	center = new Point(width / 2, height / 2);
-	// add some stuff for testing 
-	/*addFile(0);
-	addUser(2);
-	addUser(12);	
-	addTransfer(2, 0, 69, false);
-	setTimeout(testFillChunks, 2000);
-	setTimeout(testAddUser, 800);
-	setTimeout(testAddFile, 1);*/
 	updateState();
-	// have state from the server or whatever
-	
-	
+
 	setTimeout(loop, 10);
-	
-	//setTimeout(testDeltaState, 12000);
+
 };
 
 poll = function() {
