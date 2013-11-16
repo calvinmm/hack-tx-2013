@@ -7,6 +7,11 @@ var Q = require('q');
 app.use(connect.urlencoded());
 app.use(connect.json());
 
+app.configure('development', function() {
+  //app.use('/static', express.static(__dirname));
+  app.use(express.static(__dirname));
+});
+
 var connection_config =  {
   user: 'adamf',
   database: 'hacktx',
