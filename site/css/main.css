@@ -47,5 +47,10 @@ button.pad {
 }
 
 #container-nopad {
+    display: none;
     padding-top: 0px !important;
+}
+
+#content {
+    display: none;
 }

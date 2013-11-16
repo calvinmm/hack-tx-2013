@@ -105,11 +105,7 @@ var global_room_id = -1;
 
     $("#create-button").click(function() {
         masterStart(filesToUpload);
-
-        // TODO
-        // do some action
-        // clear out shit
-
+        transitionPage();
     });
 
     // display the files on the right hand side
@@ -133,11 +129,23 @@ function setupRoom(room_id) {
     // set global room id
     global_room_id = room_id;
 
-    // TODO
     // update page with room_id
-    // window.history.pushState();
-
+    window.history.pushState({}, "Hack TX 2013", "/" + room_id);
     clientStartLoops();
+}
+
+function transitionPage() {
+    console.log("moving page to room");
+    $("#content").slideUp();
+    $("#container-nopad").fadeIn();
+
+    // add in vis.js
+    var item = document.createElement('script');
+    item.type = 'text/javascript';
+    item.async = true;
+    item.src = 'js/vis.js';
+    var s = document.getElementsByTagName('script')[0];
+    s.parentNode.insertBefore(item, s);
 }
 
 function clientStartLoops() {
@@ -154,14 +162,14 @@ function clientStartLoops() {
 
 // run on load only
 (function checkRoomExists() {
-    // TODO
-    // if we have id, kill page, show only setup
-
     // set global loop id
     // call looping functions
     var path = window.location.pathname;
     if (path.substring(1).match(/^\d+$/)) {
         global_room_id = Number(path.substring(1));
+        transitionPage();
         clientStartLoops();
+    } else {
+        $("#content").fadeIn();
     }
 })();
