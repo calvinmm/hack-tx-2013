@@ -15,7 +15,6 @@ var connections = {};
 // Only the master will have this
 var file_handles = {};
 // All peers will have this
-var file_part_handles = {};
 var finished_files = {};
 
 var message_types = {
@@ -128,7 +127,6 @@ function addFiles(descripts) {
     if (descripts.hasOwnProperty(f)) {
       if (!state.files[f]) {
         state.files[f] = descripts;
-        file_part_handles[f] = {};
       }
     }
   }
@@ -305,7 +303,7 @@ function sendSlicedBlock(file_id, block_num, rec) {
 }
 
 function sendFSBlock(file_id, block_num , rec) {
-  var filename = file_part_handles[file_id][block_num];   // this is just a string
+  var filename = getFileName(file_id, block_num);   // this is just a string
   fs.root.getFile(filename, {}, function(fileEntry) {
     fileEntry.file(function(file) {
       var reader = new FileReader();
