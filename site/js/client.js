@@ -321,7 +321,7 @@ function cleanTransfers() {
     if (finished_files.hasOwnProperty(v)) {
       for (var t in state.transfers) {
         if (state.transfers.hasOwnProperty(t)) {
-          if (state.transfers.rec_block.file_id == v) {
+          if (state.transfers[t].rec_block.file_id == v) {
             updateBlockReceiving("", -1, t);
           }
         }
