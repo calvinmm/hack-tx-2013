@@ -20,7 +20,6 @@ var transferSpeed = 4;
 var currenttransfers = [];
 
 var head = undefined;
-var totalFileChunks = 0;
 
 // ms per frame
 var ms = 25;
@@ -86,7 +85,6 @@ addUser = function(userid, host) {
 
 addFile = function(name, size, file_id, numchunks, curchunks) {
 	fileNodes.push(new FileNode(name, size, file_id, numchunks, curchunks));
-	totalFileChunks += numchunks;
 };
 
 
@@ -98,6 +96,7 @@ function Point(x, y) {
 };
 
 function Link(a, b) {
+  //debugger;
   this.a = a;
   this.b = b;
   this.u = 0.0;
@@ -107,12 +106,14 @@ function Link(a, b) {
 };
 
 Link.prototype.update = function(distToMove) {
+   //debugger;
 	var distleft = (1 - this.u) * this.len;
 	if (distleft < distToMove) {
 		this.u = 1.0;
 		return distToMove - distleft;
 	}
 	this.u += 1.0 * distToMove / this.len;
+  //console.log('moved u to ' + this.u);
 	return 0;
 };
 
@@ -261,7 +262,7 @@ draw = function() {
 	// draw each current transfer
 	for (var i = 0; i < currenttransfers.length; i++) {
 		var transpt = currenttransfers[i].cur.getPoint();
-		//window.console.log(transpt.x + " " + transpt.y);
+		//console.log(transpt.x + " " + transpt.y);
 		ctx.fillStyle = currenttransfers[i].color;
 		ctx.beginPath();
 		ctx.arc(transpt.x, transpt.y, transRadius, 0, 2*Math.PI, false);
@@ -272,6 +273,10 @@ draw = function() {
 	ctx.strokeStyle = fileStrokeStyle;
 	ctx.lineWidth = 3;
 	var totalArc = 0;
+  var totalFileChunks = 0;
+  for (var i = 0; i < fileNodes.length; i++) {
+    totalFileChunks += fileNodes[i].totalchunks;
+  }
 	for (var i = 0; i < fileNodes.length; i++) {	
 		var percentChunks = fileNodes[i].totalchunks / totalFileChunks;
 		var arc = Math.PI * 2 * percentChunks;
@@ -331,6 +336,8 @@ testFillChunks = function() {
 	}
 };
 
+printed = false;
+
 updateState = function() {
 	// go through users to see if need to add any of users
 	var user_list = state.others;
@@ -358,6 +365,9 @@ updateState = function() {
 		for (var i = 0; i < fileNodes.length; i++) {
 			if (fileNodes[i].id == file_id) {
 				// update this dude
+        fileNodes[i].name = file.name;
+        fileNodes[i].size = file.size;
+        fileNodes[i].totalchunks = file.num_blocks;
 				fileNodes[i].curchunks = file.blocks.length;
 				found = true;
 				break;
@@ -436,6 +446,21 @@ updateState = function() {
   }
 	// call calvin's function to update progress bars
 	displayProgress(fileNodes);
+  if (fileNodes.length > 0 && printed == false) {
+    console.log(state);
+    console.log('fileNodes = ');
+    console.log(fileNodes);
+    console.log('userNodes = ');
+    console.log(userNodes);
+    console.log('transfers = ');
+    console.log(currenttransfers);
+    printed = true;
+  }
+  /*if (fileNodes.length > 0 && fileNodes[0].name == undefined) {
+    console.log('bad file');
+  } else {
+    console.log(fileNodes[0]);
+  }*/
 };
 
 init = function() {

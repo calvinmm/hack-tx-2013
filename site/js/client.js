@@ -1,5 +1,7 @@
 var BROKER_HOST = "ec2-54-201-76-213.us-west-2.compute.amazonaws.com";
 var API_HOST = "http://" + BROKER_HOST + "/api";
+//var BROKER_HOST = "localhost"
+//var API_HOST = "http://" + BROKER_HOST;
 var BROKER_PORT = 8080;
 
 var peer = new Peer({
@@ -234,6 +236,9 @@ var DELAY = 120
 function sendMessage(message, rec) {
   message.sender = me;
   setTimeout(function() {
+    //console.log(connections);
+    //console.log(connections[rec]);
+    //console.log(rec);
     connections[rec].send(message);
   }, DELAY);
 }
