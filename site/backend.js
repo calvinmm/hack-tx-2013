@@ -3,6 +3,7 @@ var express = require('express');
 var connect = require('connect');
 var app = express();
 var Q = require('q');
+var fs = require('fs');
 
 app.use(connect.urlencoded());
 app.use(connect.json());
@@ -10,7 +11,15 @@ app.use(connect.json());
 app.configure('development', function() {
   //app.use('/static', express.static(__dirname));
   app.use(express.static(__dirname));
+  app.get(/^\/\d+$/, function(req, res) {
+    var data  = fs.readFileSync(__dirname + '/index.html');
+    res.format({
+      'text/html' : function() { res.send(data); }
+    });
+  });
 });
+
+
 
 var connection_config =  {
   user: 'adamf',
