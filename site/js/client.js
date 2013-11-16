@@ -32,10 +32,9 @@ var file_handles = {};
 var finished_files = {};
 
 var message_types = {
-  REQ_FILES : 0,
-  RES_FILES : 1,
-  REQ_BLOCK : 2,
-  RES_BLOCK : 3
+  RES_FILES : 0,
+  REQ_BLOCK : 1,
+  RES_BLOCK : 2
 };
 
 function masterStart(filesToUpload) {
@@ -61,6 +60,7 @@ function registerFile(room_id, file) {
     room_id: room_id,
     peer_id: me
   }, function(file_id) {
+    console.log("should be file_id", file_id);
     masterAddedFile(file, file_id);
     deferred.resolve();
   });
@@ -70,6 +70,7 @@ function registerFile(room_id, file) {
 function registerRoom() {
   var deferred = $.Deferred();
   $.post('/api/new_room', function(data) {
+    console.log("should be room_id", data);
     deferred.resolve(data);
   });
   return deferred;
@@ -97,9 +98,22 @@ function getParticipants() {
     return;
   }
   $.get("/api/subscribe/" + file_id + "?peer_id=" + me, function(data) {
+    console.log("should be an array of peers", data);
     addNewPeers(data);
     getParticipants();
   });
+}
+
+function addNewPeersFromNewState(other_state) {
+  var peer_list = [];
+  for (var p in other_state) {
+    if (other_state.hasOwnProperty(p)) {
+      peer_list.push(p);
+    }
+  }
+  if (peer_list.length > 0) {
+    addNewPeers(peer_list);
+  }
 }
 
 function addNewPeers(new_peers) {
@@ -164,7 +178,8 @@ function updateOtherState() {
     if (state.files.hasOwnProperty(file_id)) {
       // fire off ajax request
       $.get("/api/status/" + file_id, function(data) {
-
+        console.log("should be the new other_state", data);
+        addNewPeersFromNewState(data);
         state.other_states = data;
       })
     }
@@ -201,9 +216,7 @@ function sendData(message, rec) {
 
 function processMessage(message) {
   var sender = message.sender;
-  if (message.type == message_types.REQ_FILES) {
-    sendFileDescriptors(sender);
-  } else if (message.type == message_types.RES_FILES) {
+  if (message.type == message_types.RES_FILES) {
     master = sender;
     addFiles(message.data);
   } else if (message.type = message_types.REQ_BLOCK) {
@@ -229,14 +242,6 @@ function processData(message) {
 
 function hasBlock(file_id, block_num) {
   return state.files[file_id].blocks.indexOf(block_num) != -1
-}
-
-// Asks someone for file descriptors
-function reqFiles(rec) {
-  var message = {
-    type : message_types.REQ_FILES
-  };
-  sendMessage(message, rec);
 }
 
 // Sends the file descriptions we know of to rec

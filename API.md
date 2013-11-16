@@ -6,7 +6,7 @@ Proposed API
   Returns room_id
 
 * > POST /new_file
-  > Data: size=Number of blocks in file, room_id
+  > Data: size=Number of blocks in file, room_id, peer_id
   Creates a new file object in the given room, with given number of blocks
   Returns a file_id
 
