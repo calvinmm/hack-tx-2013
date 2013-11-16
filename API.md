@@ -8,8 +8,10 @@ Proposed API
 
 * > GET /file/file_id
   Returns a JSON object:
-  > { blocks=[Array of block ids],
-  >  peers=[Array of peer ids]
+  > {
+  >  peers = {
+        peer_id: [Array of block ids],
+     }
   > }
 
   (I assume we can encode the way to connect to the peers in an id)
