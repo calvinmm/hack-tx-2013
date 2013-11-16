@@ -27,12 +27,12 @@ Q.ninvoke(client, "connect").then(
                      ' room_id INT REFERENCES rooms(room_id))');
       }).then(function() {
         return query('CREATE TABLE peers' +
-                     '(peer_id INT PRIMARY KEY,' +
+                     '(peer_id varchar(16) PRIMARY KEY,' +
                      ' file_id INT REFERENCES files(file_id))');
       }).then(function() {
         return query('CREATE TABLE status' +
                      '( file_id INT REFERENCES files(file_id), ' +
-                     'peer_id INT REFERENCES peers(peer_id),' +
+                     'peer_id varchar(16) REFERENCES peers(peer_id),' +
                      'block_id INT,' +
                      'UNIQUE(file_id, peer_id, block_id))');
       });
