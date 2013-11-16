@@ -28,14 +28,13 @@ button.pad {
 }
 
 #progress {
-    width: 500px;
+    width: 450px;
     margin: 20px auto;
     padding-left: 30px;
     padding-right: 30px;
 }
 
-#display {
-    border: 2px dashed #ccc;
+#canvasdiv {
     height: 640px;
     width: 640px;
     margin: 20px auto;
