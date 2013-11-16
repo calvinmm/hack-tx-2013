@@ -1,8 +1,17 @@
 var pg = require('pg');
-var conString = "postgres://postgres@localhost/hacktx";
+var connection_config =  {
+  user: 'adamf',
+  database: 'hacktx',
+  host: 'localhost',
+  port: 5432,
+  ssl: true,
+  password: 'hacktx'
+};
+
+
 var Q = require('q');
 
-var client = new pg.Client(conString);
+var client = new pg.Client(connection_config);
 var query = Q.nbind(client.query, client);
 
 console.log('connecting');
