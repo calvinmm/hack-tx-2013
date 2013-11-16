@@ -30,14 +30,50 @@ function get_file_size(file_id) {
       });
 }
 
+// Return a map of peer to lists of blocks
+function get_peer_blocks(file_id) {
+  return query('SELECT peer_id, block_id FROM status WHERE file_id=$1', [file_id])
+    .then(
+      function(qresult) {
+        var results = {};
+        qresult.rows.forEach(function(row) {
+          var peer_id = row.peer_id;
+          var block_id = row.block_id;
+          if (results[peer_id]) {
+            results[peer_id].push(block_id);
+          } else {
+            results[peer_id] = [block_id];
+          }
+        });
+        return results;
+      });
+}
+
+// Add block to file for peer
+function update_status(file_id, peer_id, block_id) {
+  return query('INSERT INTO status (file_id, peer_id, block_id)' +
+               ' VALUES ($1, $2, $3)', [file_id, peer_id, block_id])
+  .fail(function(err) {
+    console.log('Error updating status', err);
+  });
+}
+
+function check_peer_exists(file_id, peer_id) {
+  return query('SELECT peer_id FROM peers WHERE file_id=$1 AND peer_id=$2',
+               [file_id, peer_id]).then(function(result) {
+                 return result.rows.length > 0;
+               });
+}
+
+function add_peer(file_id, peer_id) {
+  return query('INSERT INTO peers (peer_id, file_id) VALUES ($1, $2)',
+               [peer_id, file_id]);
+}
+
 Q.ninvoke(client, "connect").then(
   function() {
 
-    // Maps from file_ids to a object of this form
-    // {
-    //   watchers => { peer_id: true if already notified }
-    //   responses => [ response objects ]
-    // }
+    // Maps from file_ids to res's that are subscribed to the file
     var subscribers = {};
 
     app.post('/new_file', function(req, res) {
@@ -56,46 +92,51 @@ Q.ninvoke(client, "connect").then(
       );
     });
 
-    app.get('/file/:file_id', function(req, res) {
-      var file_id = req.params.file_id;
-      var size_query = get_file_size(file_id);
-      var peers_query = get_peers_for_fileid(file_id);
-      Q.all([size_query, peers_query]).then(function(results) {
-        var size = results[0];
-        var peers = results[1];
-        res.send({size: size,
-                  peers: peers});
-      });
-    });
-
     app.get('/subscribe/:file_id', function(req, res) {
       var file_id = req.params.file_id;
       var peer_id = req.query.peer_id;
 
-      var file_subscriptions = subscribers[file_id];
-      if (!file_subscriptions) {
-        file_subscriptions = { watchers: {}, responses: [] };
-        subscribers[file_id] = file_subscriptions;
-      }
-
-      var is_new = !(file_subscriptions.watchers[peer_id]);
-      if (is_new) {
-        var to_notify = file_subscriptions.responses || [];
-        to_notify.forEach(function(notify_res) {
-          notify_res.send(peer_id);
-        });
-        file_subscriptions.responses = [res];
-        file_subscriptions.watchers[peer_id] = true;
-      } else {
-        file_subscriptions.responses.push(res);
-      }
+      check_peer_exists(file_id, peer_id).then(function(exists) {
+        // If the peer does not exist, inform everyone and add it
+        if (!exists) {
+          var to_notify = subscribers[file_id] || [];
+          to_notify.forEach(function(notify_res) {
+            notify_res.send(peer_id);
+          });
+          // Clear the subscribers, except for the node that just joined
+          subscribers[file_id] = [res];
+          return add_peer(file_id, peer_id);
+        } else {
+          if (subscribers[file_id]) {
+            subscribers[file_id].push(res);
+          } else {
+            subscribers[file_id] = [res];
+          }
+        }
+      }).fail(function(err) {
+        console.err('Something failed while subscribing', err);
+      });
     });
 
     app.get('/status/:file_id', function(req, res) {
       var file_id = req.params.file_id;
-      res.send('NOT IMPLEMENTED');
+      get_peer_blocks(file_id).then(function(result) {
+        res.send(result);
+      });
+    });
+
+    app.post('/update/:file_id', function(req, res) {
+      var file_id = req.params.file_id;
+      var peer_id = req.body.peer_id;
+      var block_id = req.body.block_id;
+      update_status(file_id, peer_id, block_id)
+      .then(function() {
+        res.send('OK');
+      });
     });
 
     console.log('Listening on 3000');
     app.listen(3000);
+  }, function(err) {
+  console.log('could not connect to postgres', err);
   });
