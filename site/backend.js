@@ -30,6 +30,34 @@ function get_file_size(file_id) {
       });
 }
 
+// Return a map of peer to lists of blocks
+function get_peer_blocks(file_id) {
+  return query('SELECT peer_id, block_id FROM status WHERE file_id=$1', [file_id])
+    .then(
+      function(qresult) {
+        var results = {};
+        qresult.rows.forEach(function(row) {
+          var peer_id = row.peer_id;
+          var block_id = row.block_id;
+          if (results[peer_id]) {
+            results[peer_id].push(block_id);
+          } else {
+            results[peer_id] = [block_id];
+          }
+        });
+        return results;
+      });
+}
+
+// Add block to file for peer
+function update_status(file_id, peer_id, block_id) {
+  return query('INSERT INTO status (file_id, peer_id, block_id)' +
+               ' VALUES ($1, $2, $3)', [file_id, peer_id, block_id])
+  .fail(function(err) {
+    console.log('Error updating status', err);
+  });
+}
+
 Q.ninvoke(client, "connect").then(
   function() {
 
@@ -93,7 +121,20 @@ Q.ninvoke(client, "connect").then(
 
     app.get('/status/:file_id', function(req, res) {
       var file_id = req.params.file_id;
-      res.send('NOT IMPLEMENTED');
+      get_peer_blocks(file_id).then(function(result) {
+        res.send(result);
+      });
+    });
+
+    app.post('/update/:file_id', function(req, res) {
+      console.log('request received');
+      var file_id = req.params.file_id;
+      var peer_id = req.body.peer_id;
+      var block_id = req.body.block_id;
+      update_status(file_id, peer_id, block_id)
+      .then(function() {
+        res.send('OK');
+      });
     });
 
     console.log('Listening on 3000');
