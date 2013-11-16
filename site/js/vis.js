@@ -571,7 +571,7 @@ updateState = function() {
 		}
   }
 	// call calvin's function to update progress bars
-	//displayProgress(fileNodes);
+	displayProgress(fileNodes);
 };
 
 testDeltaState = function() {
