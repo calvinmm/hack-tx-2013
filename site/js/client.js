@@ -1,7 +1,21 @@
 
 // TODO: fill in these global fields from server api calls
-var me = "myrandomid" + Math.random();
+var BROKER_HOST = "ec2-54-201-76-213.us-west-2.compute.amazonaws.com";
+var BROKER_PORT = 8080;
+
+var peer = new Peer({
+  host: BROKER_HOST,
+  port: BROKER_PORT,
+  reliable: true
+});
+
+var me = "";
 var master = "master";
+
+// Connect to the broker server
+peer.on('open', function(id) {
+  me = id;
+});
 
 var BLOCK_SIZE = 4096;
 
@@ -24,21 +38,92 @@ var message_types = {
   RES_BLOCK : 3
 };
 
-// Should be called when a file is selected
-function handleFileSelect(evt) {
-  evt.stopPropagation();
-  evt.preventDefault();
+function masterStart(filesToUpload) {
+  if (filesToUpload.length == 0) {
+    return;
+  }
+  for (var i = 0; i < filesToUpload.length; i++) {
+    masterAddedFile(filesToUpload[i]);
+  }
+  // TODO: register room
+  var room_id = "ahsldfkjl";
+  setupRoom(room_id);
+  // TODO: register each file with the room
+  // TODO: tell server we have every part of every file
+}
 
-  var files = evt.dataTransfer.files; // FileList object.
+function informServer(file_id, block_num) {
+  $.post("/api/update/" + file_id, {peer_id: me, block_id: block_num}, function(data) {
+    // Don't really care about a response
+    console.log("update response: ", data);
+  });
+}
 
-  // files is a FileList of File objects. List some properties.
-  var output = [];
-  for (var i = 0, f; f = files[i]; i++) {
-    masterAddedFile(f);
+function getParticipants() {
+  // Initially called to get all people in room, recursively called for
+  // continuous updates
+  // Assume that all involved peers are involved in all files
+  // TODO: remove this assumption
+  var file_id = "";
+  for (var file in state.files) {
+    if (state.files.hasOwnProperty(file)) {
+      file_id = file;
+      break;
+    }
+  }
+  if (file_id == "") {
+    return;
+  }
+  $.get("/api/subscribe/" + file_id + "?peer_id=" + me, function(data) {
+    addNewPeers(data);
+    getParticipants();
+  });
+}
+
+function addNewPeers(new_peers) {
+  for (var i = 0; i < new_peers.length; i++) {
+    var p = new_peers[i];
+    if (state.others.indexOf(p) != -1) {
+      continue;
+    }
+    addPeer(p);
+  }
+}
+
+function addPeer(peer_id) {
+  state.others.push(p);
+  if (!state.other_states[p]) {
+    state.other_states[p] = [];
+  }
+  connections[peer] = {};
+  var message_conn = peer.connect(peer_id);
+  message_conn.open('open', function() {
+    message_conn.on('data', processMessage);
+    connections[peer].message = message_conn;
+    if (me == master) {
+      sendFileDescriptors(peer);
+    }
+  });
+  var data_conn = peer.connect(peer_id);
+  data_conn.open('open', function() {
+    data_conn.on('data', processData);
+    connections[peer].data = data_conn;
+  });
+}
+
+function updateOtherState() {
+  for (var file_id in state.files) {
+    if (state.files.hasOwnProperty(file_id)) {
+      // fire off ajax request
+      $.get("/api/status/" + file_id, function(data) {
+        state.other_states = data;
+      })
+    }
   }
 }
 
 function masterAddedFile(file) {
+  master = me;
   var id = guid();
   var n = Math.ceil(file.size / BLOCK_SIZE);
   var blocks = [];
@@ -71,6 +156,7 @@ function processMessage(message) {
   if (message.type == message_types.REQ_FILES) {
     sendFileDescriptors(sender);
   } else if (message.type == message_types.RES_FILES) {
+    master = sender;
     addFiles(message.data);
   } else if (message.type = message_types.REQ_BLOCK) {
     sendBlock(message.file_id, message.block_num, sender)
@@ -132,6 +218,10 @@ function addFiles(descripts) {
   }
 }
 
+function refreshPeers() {
+  // TODO: call updatePeer on everyone
+}
+
 function updatePeer(peer_id) {
   if (!state.transfers[peer_id]) {
     state.transfers[peer_id] = {
@@ -191,6 +281,7 @@ function writeBlock(file_id, block_num, data, sender) {
       fileWriter.onwriteend = function(e) {
         addReceivedBlock(file_id, block_num);
         updateBlockReceiving("", -1, sender);
+        informServer(file_id, block_num);
         checkDoneWithFile(file_id);
       };
       fileWriter.onerror = function(e) {
