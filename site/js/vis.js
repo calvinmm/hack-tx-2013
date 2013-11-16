@@ -15,7 +15,7 @@ var userNodeRadius = 20;
 var fileNodeRadius = 100;
 var transRadius = 12;
 
-var transferSpeed = 4;
+var transferSpeed = 6;
 
 var currenttransfers = [];
 
@@ -119,7 +119,7 @@ Link.prototype.getPoint = function() {
 };
 
 Link.prototype.reset = function() {
-	this.u = -0.5;
+	this.u = -0.1;
 };
 
 addTransfer = function(userid, fileid, downloading) {
@@ -137,13 +137,13 @@ addTransfer = function(userid, fileid, downloading) {
 	}
 	var fnode = undefined;
 	for (var i = 0; i < fileNodes.length; i++) {
-		if (fileNodes[i].id == file_id) {
+		if (fileNodes[i].id == fileid) {
 			fnode = fileNodes[i];
 			break;
 		}
 	}
 
-	currenttransfers.push( new Transfer(unode.point, center, downloading, userid, file_id, fnode.filledStyle) );
+	currenttransfers.push( new Transfer(unode.point, center, downloading, userid, fileid, fnode.filledStyle) );
 };
 
 removeTransfer = function(uid, file_id, chunkid, downloading) {
@@ -393,8 +393,13 @@ updateState = function() {
 			}
 		}
 		if (found) {
+      console.log('continuing transfer', t);
 			newtransfers.push(t);
-		}
+		} else {
+      console.log('removing transfer', t);
+      console.log('wasn\'t found in transfers: ');
+      console.log(state.transfers);
+    }
 	}
 	currenttransfers = newtransfers;
 	var length = currenttransfers.length; // don't need to check ones we add in here

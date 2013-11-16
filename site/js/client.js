@@ -22,7 +22,7 @@ peer.on('open', function(id) {
 });
 peer.on('connection', addConnection);
 
-var BLOCK_SIZE = 4096;
+var BLOCK_SIZE = 512;
 
 var state = {
   others: [],
@@ -233,7 +233,7 @@ function masterAddedFile(file, file_id) {
   finished_files[file_id] = true;
 }
 
-var DELAY = 0;
+var DELAY = 120;
 
 var RETRY_LIMIT = 100;
 var retry_limits = {};
@@ -483,8 +483,15 @@ function updateBlockSending(file_id, block_num, peer_id) {
       rec_block: {file_id: "", block: -1}
     };
   }
-  state.transfers[peer_id].send_block.file_id = file_id;
-  state.transfers[peer_id].send_block.block = block_num;
+  var update = function() {
+    state.transfers[peer_id].send_block.file_id = file_id;
+    state.transfers[peer_id].send_block.block = block_num;
+  };
+  if (block_num != -1) {
+    update();
+  } else {
+    setTimeout(update(), 100);
+  }
 }
 
 function sendBlock(file_id, block_num, rec) {
