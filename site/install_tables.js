@@ -4,7 +4,6 @@ var connection_config =  {
   database: 'hacktx',
   host: 'localhost',
   port: 5432,
-  ssl: true,
   password: 'hacktx'
 };
 
