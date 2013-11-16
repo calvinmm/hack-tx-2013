@@ -1,6 +1,8 @@
 {
   "name": "HackTX",
   "dependencies": {
-    "express": "*"
+    "express": "*",
+    "pg": "*",
+    "q": "*"
   }
 }
