@@ -14,8 +14,15 @@ function displayProgress(fileNodes) {
 
         var percentDone = currentFile.progress() * 100.0;
 
+        var classText = "progress-bar progress-bar-primary";
+
+        // update to green if 100%
+        if (percentDone == 100) {
+            classText = "progress-bar progress-bar-success";
+        }
+
         var barbar = $("<div>", {
-            "class": "progress-bar progress-bar-primary"
+            "class": classText
         }).attr("role", "progressbar")
           .attr("aria-valuenow", percentDone + "")
           .attr("aria-valuemin", "0")
