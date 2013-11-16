@@ -12,12 +12,12 @@ var fileNodes = [];
 var center = undefined;
 var radius = 180;
 
-var userNodeRadius = 12;
+var userNodeRadius = 20;
 
 var fileNodeRadius = 100;
-var transRadius = 6;
+var transRadius = 12;
 
-var transferSpeed = 7;
+var transferSpeed = 4;
 
 var currenttransfers = [];
 
@@ -75,8 +75,8 @@ nextPoint = function() {
 	}
 	bestAngle = Math.PI - bestAngle; // want 0 to be at 180 (first node is on left) and clockwise around
   // extend radius if would cause collisions
-	if (userNodeRadius > radius * maxAngle) {
-		radius += userNodeRad;
+	if (3 *userNodeRadius > radius * maxAngle) {
+		radius += 4 * userNodeRadius;
 	}
 	return new Point(center.x + radius * Math.cos(bestAngle), center.y + radius * Math.sin(bestAngle));
 };
@@ -183,15 +183,15 @@ Transfer.prototype.update = function(distToMove) {
 
 randomFileStyle = function(fnode) {
 	// want random value between 20 and FF for each base color so the filled color can be slightly darker (20 darker to be exact)
-	var dec20 = 32;
+	var decbase = 96;
   var decFF = 255;
-	var redval = Math.floor(Math.random() * (decFF - dec20 + 1));
-	var greenval = Math.floor(Math.random() * (decFF - dec20 + 1));
-	var blueval = Math.floor(Math.random() * (decFF - dec20 + 1));
+	var redval = Math.floor(Math.random() * (decFF - decbase + 1));
+	var greenval = Math.floor(Math.random() * (decFF - decbase + 1));
+	var blueval = Math.floor(Math.random() * (decFF - decbase + 1));
 	fnode.filledStyle = "#" + hexDig(redval / 16) + hexDig(redval % 16) + hexDig(greenval / 16) + hexDig(greenval % 16) + hexDig(blueval / 16) + hexDig(blueval % 16);
-	redval += dec20;
-	greenval += dec20;
-	blueval += dec20;
+	redval += decbase;
+	greenval += decbase;
+	blueval += decbase;
 	fnode.clearStyle = "#" + hexDig(redval / 16) + hexDig(redval % 16) + hexDig(greenval / 16) + hexDig(greenval % 16) + hexDig(blueval / 16) + hexDig(blueval % 16);
 };
 
@@ -334,7 +334,7 @@ testFillChunks = function() {
 testuserid = 15;
 testAddUser = function() {
 	addUser(testuserid++);
-	setTimeout(testAddUser, 7500);
+	setTimeout(testAddUser, 800);
 };
 
 testfileid = 3;
@@ -354,7 +354,7 @@ init = function() {
 	addTransfer(2, 0, 69, false);
 	setTimeout(loop, 10);
 	setTimeout(testFillChunks, 2000);
-	setTimeout(testAddUser, 8000);
+	//setTimeout(testAddUser, 800);
 	setTimeout(testAddFile, 1);
 };
 
