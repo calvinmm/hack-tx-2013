@@ -526,7 +526,7 @@ function errorHandler(e) {
       msg = 'Unknown Error';
       break;
   }
-  document.querySelector('#example-list-fs-ul').innerHTML = 'Error: ' + msg;
+  //document.querySelector('#example-list-fs-ul').innerHTML = 'Error: ' + msg;
 }
 
 function initFS() {

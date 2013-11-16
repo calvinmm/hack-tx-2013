@@ -126,7 +126,7 @@ Link.prototype.reset = function() {
 
 addTransfer = function(userid, file_id, chunkid, downloading) {
 
-  console.log("looking for " + file_id);
+  //console.log("looking for " + file_id);
 
 	var unode = undefined;
 	if (userid != undefined) {
@@ -139,7 +139,7 @@ addTransfer = function(userid, file_id, chunkid, downloading) {
 	}
 	var fnode = undefined;
 	for (var i = 0; i < fileNodes.length; i++) {
-    console.log(fileNodes[i].id);
+    //console.log(fileNodes[i].id);
 		if (fileNodes[i].id == file_id) {
 			fnode = fileNodes[i];
 			break;
@@ -225,7 +225,6 @@ function UserNode(point, userid, host) {
 
 update = function() {
   updateState();
-	// TODO if any state changed, modify it
 	// update all transfers
 	for (var i = 0; i < currenttransfers.length; i++) {
 		currenttransfers[i].update(transferSpeed);
@@ -365,6 +364,7 @@ updateState = function() {
 			}
 		}
 		if(!found) {
+      window.console.log(file);
 			addFile(file.name, file.size, file_id, file.num_blocks, file.blocks.length);
 		}
 	}
@@ -395,24 +395,25 @@ updateState = function() {
     var found = false;
     var trans = state.transfers[userid].send_block;
 
-    // what the fuck is a chunk id
+    // what the fuck is a chunk id your mom
 
-    console.log("trans=");
-    console.log(trans);
+    //console.log("trans=");
+    //console.log(trans);
 
 		if (trans.file_id != '') {
     	for (var i = 0; i < length; i++) {
     		var t = currenttransfers[i];
-        console.log("t = ");
-        console.log(t);
+
+        //console.log("t = ");
+        //console.log(t);
     	  if (t.id == userid && t.file_id == trans.file_id && t.chunk == trans.block && !t.down) {
     	    found = true;
     	    break;
     	  }
 			}
 			if (!found) {
-        console.log(trans);
-        console.log("1) calling addTransfer: " + trans + ", " + trans.file_id + ", " + trans.chunkid);
+        //console.log(trans);
+        //console.log("1) calling addTransfer: " + trans + ", " + trans.file_id + ", " + trans.chunkid);
         addTransfer(userid, trans.file_id, trans.chunkid, false);
       }
 		}
@@ -427,8 +428,8 @@ updateState = function() {
     	  }
     	}
     	if (!found) {
-        console.log(trans);
-        console.log("2) calling addTransfer: " + trans + ", " + trans.file_id + ", " + trans.block);
+        //console.log(trans);
+        //console.log("2) calling addTransfer: " + trans + ", " + trans.file_id + ", " + trans.block);
         addTransfer(userid, trans.file_id, trans.block, true);
       }
 		}
