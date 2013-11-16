@@ -1,5 +1,9 @@
-var BROKER_HOST = "localhost"; //"ec2-54-201-76-213.us-west-2.compute.amazonaws.com";
-var API_HOST = "http://" + BROKER_HOST;
+var BROKER_HOST = location.hostname;
+if (BROKER_HOST == 'localhost') {
+  var API_HOST = 'http://' + BROKER_HOST + ':3000';
+} else {
+  var API_HOST = "http://" + BROKER_HOST + "/api";
+}
 var BROKER_PORT = 8080;
 
 var peer = new Peer({
@@ -39,7 +43,7 @@ var message_types = {
 };
 
 function masterStart(filesToUpload) {
-  if (filesToUpload.length == 0) {
+  if (filesToUpload.length === 0) {
     return;
   }
   registerRoom().then(function(room_id) {
@@ -94,7 +98,7 @@ function getParticipants() {
       break;
     }
   }
-  if (file_id == "") {
+  if (file_id === "") {
     return;
   }
   $.get(API_HOST + "/subscribe/" + file_id + "?peer_id=" + me, function(data) {
@@ -228,7 +232,7 @@ function masterAddedFile(file, file_id) {
   finished_files[file_id] = true;
 }
 
-var DELAY = 120
+var DELAY = 120;
 
 // Sends a message to another user
 function sendMessage(message, rec) {
@@ -462,12 +466,12 @@ function sendSlicedBlock(file_id, block_num, rec) {
   var reader = new FileReader();
   reader.onloadend = function(evt) {
     if (evt.target.readyState == FileReader.DONE) {
-      var newBlob = new Blob([evt.target.result], {type: file.type});
+      //var newBlob = new Blob([evt.target.result], {type: file.type});
       var m = {
         file_id: file_id,
         type: message_types.RES_BLOCK,
         block_num: block_num,
-        data: newBlob,
+        data: evt.target.result,
         data_type: file.type
       };
       sendMessage(m, rec);
@@ -526,7 +530,7 @@ function errorHandler(e) {
       msg = 'Unknown Error';
       break;
   }
-  document.querySelector('#example-list-fs-ul').innerHTML = 'Error: ' + msg;
+  //document.querySelector('#example-list-fs-ul').innerHTML = 'Error: ' + msg;
 }
 
 function initFS() {

@@ -119,7 +119,7 @@ var global_room_id = -1;
                 .text(filesToUpload[i].name).append(KEEP_ITEM.clone(true));
             $(builder).append(item);
         }
-        
+
         $("#file-list").empty().append(builder);
     }
 })();
@@ -131,7 +131,9 @@ function setupRoom(room_id) {
 
     // update page with room_id
     window.history.pushState({}, "Hack TX 2013", "/" + room_id);
+  $(document).ready(function() {
     clientStartLoops();
+  });
 }
 
 function transitionPage() {
@@ -170,7 +172,9 @@ function clientStartLoops() {
     if (path.substring(1).match(/^\d+$/)) {
         global_room_id = Number(path.substring(1));
         transitionPage();
+      $(document).ready(function() {
         clientStartLoops();
+      });
     } else {
         $("#content").fadeIn();
     }
