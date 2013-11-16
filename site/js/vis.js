@@ -61,7 +61,7 @@ var state = {
 				block: -1
 			},
 			rec_block: {
-				fileid: file1,
+				fileid: 'file1',
 				block: 2
 			}
 		},
@@ -288,10 +288,9 @@ FileNode.prototype.progress = function() {
 	return 1.0 * this.curchunks/this.totalchunks;
 };
 
-function UserNode(point, userid, me, host) {
+function UserNode(point, userid, host) {
 	this.point = point;
 	this.id = userid;
-	this.me = me;
 	this.host = host;
 };
 
@@ -421,13 +420,13 @@ testAddFile = function() {
 
 updateState = function() {
 	// go through users to see if need to add any of users
-	var user_list = state.other_state.others;
-	for (int i = 0; i < user_list.length; i++) {
+	var user_list = state.others;
+	for (var i = 0; i < user_list.length; i++) {
 		var userid = user_list[i];
 		if (userid == me) continue;
 		var found = false;
-		for (var i = 0; i < usersNodes.length; i++) {
-			if(userNodes[i].id == userid) {
+		for (var j = 0; j < userNodes.length; j++) {
+			if(userNodes[j].id == userid) {
 				found = true;
 				break;	
 			}
@@ -440,10 +439,10 @@ updateState = function() {
 	// don't need the info on each user in other_state
 	
 	// parse files to see how much of each file you have
-	for (fileid in state.other_state.files) {
-		file = state.other_state.files[fileid];
+	for (fileid in state.files) {
+		var file = state.files[fileid];
 		var found = false;	
-		for (int i = 0; i < fileNodes.length; i++) {
+		for (var i = 0; i < fileNodes.length; i++) {
 			if (fileNodes[i].id == fileid) {
 				// update this dude
 				fileNodes[i].curblocks = file.blocks.length;
@@ -455,7 +454,57 @@ updateState = function() {
 			addFile(file.name, file.size, fileid, file.num_blocks, file.blocks.length);
 		}
 	}
-	// tricky part: remove all transfers that are not in the new state, then 
+	// tricky part: remove all old transfers that are not in the new state, then add all new ones that are not in the old state
+  var newtransfers = [];
+	for(var i = 0; i < currenttransfers.length; i++) {
+		var t = currenttransfers[i];
+		var found = false;
+		for (userid in state.transfers) {
+			var trans = state.transfers[userid].send_block;
+			if (t.id == userid && t.fileid == trans.fileid && t.chunk == trans.block && !t.down) {
+				found = true;
+				break;
+			}
+			trans = state.transfers[userid].rec_block;
+			if (t.id == userid && t.fileid == trans.fileid && t.chunk == trans.block && t.down) {
+				found = true;
+				break;
+			}
+		}
+		if (found) {
+			newtransfers.push(t);
+		}
+	}
+	currenttransfers = newtransfers;
+	var length = currenttransfers.length; // don't need to check ones we add in here
+	for(userid in state.transfers) {
+    var found = false;
+    var trans = state.transfers[userid].send_block;
+		if (trans.fileid!= '') {
+    	for (var i = 0; i < length; i++) {
+    		var t = currenttransfers[i];
+    	  if (t.id == userid && t.fileid == trans.fileid && t.chunk == trans.block && !t.down) {
+    	    found = true;
+    	    break;
+    	  }
+			}
+			if (!found) addTransfer(userid, trans.fileid, trans.chunkid, false);
+		}
+    trans = state.transfers[userid].rec_block;
+		found = false;
+		if (trans.fileid != '') {
+			for (var i = 0; i < length; i++) {
+				var t = currenttransfers[i];
+    	  if (t.id == userid && t.fileid == trans.fileid && t.chunk == trans.block && t.down) {
+    	    found = true;
+    	    break;
+    	  }
+    	}
+    	if (!found) addTransfer(userid, trans.fileid, trans.block, true);
+		}
+  }
+	// call calvin's function to update progress bars
+	displayProgress(fileNodes);
 };
 
 init = function() {
