@@ -160,7 +160,7 @@ function clientStartLoops() {
     // set global loop id
     // call looping functions
     var path = window.location.pathname;
-    if (path.substring(1).match(/^\d+$/).length) {
+    if (path.substring(1).match(/^\d+$/)) {
         global_room_id = Number(path.substring(1));
         clientStartLoops();
     }
