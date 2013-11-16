@@ -1,5 +1,6 @@
 // array of files we are going to upload
 var filesToUpload = [];
+var global_room_id = -1;
 
 (function() {
     // add for regular upload
@@ -31,8 +32,6 @@ var filesToUpload = [];
                 return;
             }
         }
-
-
     });
 
     $(REMOVE_ITEM).hover(function() {}, function() {
@@ -104,6 +103,15 @@ var filesToUpload = [];
         }
     }
 
+    $("#create-button").click(function() {
+        masterStart(filesToUpload);
+
+        // TODO
+        // do some action
+        // clear out shit
+
+    });
+
     // display the files on the right hand side
     function displayFiles() {
         var numFiles = filesToUpload.length;
@@ -118,4 +126,30 @@ var filesToUpload = [];
         
         $("#file-list").empty().append(builder);
     }
+})();
+
+// set up our room
+function setupRoom(room_id) {
+    // set global room id
+    global_room_id = room_id;
+
+    // TODO
+    // update page with room_id
+    // window.history.pushState();
+
+    // update peers
+    window.setInterval(function() {
+        refreshPeers();
+    }, 100);
+
+    // update the states
+    window.setInterval(function() {
+        updateOtherState();
+    }, 1000);
+}
+
+// run on load only
+(function checkRoomExists() {
+    // TODO
+    // if we have id, kill page, show only setup
 })();
