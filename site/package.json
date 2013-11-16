@@ -3,6 +3,7 @@
   "dependencies": {
     "express": "*",
     "pg": "*",
-    "q": "*"
+    "q": "*",
+    "connect": "*"
   }
 }
