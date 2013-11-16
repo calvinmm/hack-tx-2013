@@ -7,8 +7,15 @@ var Q = require('q');
 app.use(connect.urlencoded());
 app.use(connect.json());
 
-var conString = "postgres://postgres@localhost/hacktx";
-var client = new pg.Client(conString);
+var connection_config =  {
+  user: 'adamf',
+  database: 'hacktx',
+  host: 'localhost',
+  port: 5432,
+  password: 'hacktx'
+};
+
+var client = new pg.Client(connection_config);
 var query = Q.nbind(client.query, client);
 
 function get_peers_for_fileid(file_id) {
