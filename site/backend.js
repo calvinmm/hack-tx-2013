@@ -104,10 +104,8 @@ function get_files_for_room(room_id) {
 }
 
 function update_all_blocks(file_id, peer_id, size) {
-  console.log('updating all blocks');
   var promises = [];
   for (var i = 0; i < size; i++) {
-    console.log('inserting into status', file_id, peer_id, i);
     promises.push(query('INSERT INTO status (file_id, peer_id, block_id)' +
                         'VALUES ($1, $2, $3)', [file_id, peer_id, i])
                  );
@@ -138,7 +136,6 @@ Q.ninvoke(client, "connect").then(
       var file_id;
       add_file(size, room_id).then(
         function(fid) {
-          console.log('fid: ', fid);
           file_id = fid;
           return update_all_blocks(file_id, peer_id, size);
         }
