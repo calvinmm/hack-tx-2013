@@ -41,7 +41,7 @@ var hostStyle = "#FF0000";
 function ListNode(ang) {
 	this.angle = ang;
 	this.next = undefined;
-};
+}
 
 ListNode.prototype.split = function() {
 	this.angle /= 2;
@@ -93,16 +93,16 @@ addFile = function(name, size, file_id, numchunks, curchunks) {
 function Point(x, y) {
   this.x = x;
   this.y = y;
-};
+}
 
 function Link(a, b) {
   this.a = a;
   this.b = b;
-  this.u = 0.0;
 	var dx = a.x - b.x;
 	var dy = a.y - b.y;
 	this.len = Math.sqrt(dx * dx + dy * dy);
-};
+  this.reset();
+}
 
 Link.prototype.update = function(distToMove) {
 	var distleft = (1 - this.u) * this.len;
@@ -119,7 +119,7 @@ Link.prototype.getPoint = function() {
 };
 
 Link.prototype.reset = function() {
-	this.u = 0.0;
+	this.u = -0.5;
 };
 
 addTransfer = function(userid, file_id, chunkid, downloading) {
@@ -258,6 +258,9 @@ draw = function() {
 	// draw each current transfer
 	for (var i = 0; i < currenttransfers.length; i++) {
 		var transpt = currenttransfers[i].cur.getPoint();
+    if (currenttransfers[i].cur.u < 0) {
+      continue;
+    }
 		//console.log(transpt.x + " " + transpt.y);
 		ctx.fillStyle = currenttransfers[i].color;
 		ctx.beginPath();
@@ -320,7 +323,6 @@ loop = function() {
   time += new Date().getTime();
   setTimeout(loop, Math.max(ms - time,0));
 };
-
 
 testFillChunks = function() {
 	var i = Math.floor(Math.random() * fileNodes.length);

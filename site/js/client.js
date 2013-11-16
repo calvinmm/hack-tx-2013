@@ -187,6 +187,7 @@ function updateOtherState() {
     });
     return;
   }
+  cleanTransfers();
   for (var file_id in state.files) {
     if (state.files.hasOwnProperty(file_id)) {
       fireUpdateFileStateRequest(file_id);
@@ -234,13 +235,28 @@ function masterAddedFile(file, file_id) {
 
 var DELAY = 0;
 
+var RETRY_LIMIT = 100;
+var retry_limits = {};
+
 // Sends a message to another user
 function sendMessage(message, rec) {
   message.sender = me;
   setTimeout(function() {
     if (connections[rec] === undefined) {
       // Retry if other user hasn't connected yet
-      sendMessage(message, rec);
+      if (!retry_limits[rec]) {
+        retry_limits[rec] = 1;
+      } else if (retry_limits[rec] < RETRY_LIMIT) {
+        retry_limits[rec] += 1;
+        sendMessage(message, rec);
+      } else {
+        // Assume this rec is dead
+        if (message.type == message_types.REQ_BLOCK) {
+          updateBlockReceiving("", -1, rec);
+        } else if (message.type == message_types.RES_BLOCK) {
+          updateBlockSending("", -1, rec);
+        }
+      }
     } else {
       connections[rec].send(message);
     }
@@ -295,6 +311,20 @@ function addFiles(descripts) {
     if (descripts.hasOwnProperty(f)) {
       if (!state.files[f] || !state.files[f].name) {
         state.files[f] = descripts[f];
+      }
+    }
+  }
+}
+
+function cleanTransfers() {
+  for (var v in finished_files) {
+    if (finished_files.hasOwnProperty(v)) {
+      for (var t in state.transfers) {
+        if (state.transfers.hasOwnProperty(t)) {
+          if (state.transfers.rec_block.file_id == v) {
+            updateBlockReceiving("", -1, t);
+          }
+        }
       }
     }
   }
