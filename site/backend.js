@@ -32,6 +32,14 @@ function get_file_size(file_id) {
 
 Q.ninvoke(client, "connect").then(
   function() {
+
+    // Maps from file_ids to a object of this form
+    // {
+    //   watchers => { peer_id: true if already notified }
+    //   responses => [ response objects ]
+    // }
+    var subscribers = {};
+
     app.post('/new_file', function(req, res) {
       var size = parseInt(req.body.size);
       query('INSERT INTO files (size) VALUES ($1) RETURNING file_id', [size])
@@ -61,9 +69,26 @@ Q.ninvoke(client, "connect").then(
     });
 
     app.get('/subscribe/:file_id', function(req, res) {
-      setTimeout(20000, function() {
-        res.send('NOT IMPLEMENTED');
-      });
+      var file_id = req.params.file_id;
+      var peer_id = req.query.peer_id;
+
+      var file_subscriptions = subscribers[file_id];
+      if (!file_subscriptions) {
+        file_subscriptions = { watchers: {}, responses: [] };
+        subscribers[file_id] = file_subscriptions;
+      }
+
+      var is_new = !(file_subscriptions.watchers[peer_id]);
+      if (is_new) {
+        var to_notify = file_subscriptions.responses || [];
+        to_notify.forEach(function(notify_res) {
+          notify_res.send(peer_id);
+        });
+        file_subscriptions.responses = [res];
+        file_subscriptions.watchers[peer_id] = true;
+      } else {
+        file_subscriptions.responses.push(res);
+      }
     });
 
     app.get('/status/:file_id', function(req, res) {
