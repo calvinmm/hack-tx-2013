@@ -132,7 +132,7 @@ Q.ninvoke(client, "connect").then(
     app.post('/new_file', function(req, res) {
       var size = parseInt(req.body.size);
       var room_id = parseInt(req.body.room_id);
-      var peer_id = parseInt(req.body.peer_id);
+      var peer_id = req.body.peer_id;
       var file_id;
       add_file(size, room_id).then(
         function(fid) {
