@@ -187,6 +187,7 @@ function updateOtherState() {
     });
     return;
   }
+  cleanTransfers();
   for (var file_id in state.files) {
     if (state.files.hasOwnProperty(file_id)) {
       fireUpdateFileStateRequest(file_id);
@@ -241,7 +242,17 @@ function sendMessage(message, rec) {
     //console.log(connections);
     //console.log(connections[rec]);
     //console.log(rec);
-    connections[rec].send(message);
+    try {
+      connections[rec].send(message);
+    } catch (e) {
+      // we need to realize that we failed to send and do the right thing
+      if (message.type == message_types.REQ_BLOCK) {
+        updateBlockReceiving("", -1, rec);
+      } else if (message.type == message_types.RES_BLOCK) {
+        updateBlockSending("", -1, rec);
+      }
+      console.log("failed to send message", message, "to", rec, "error:", e);
+    }
   }, DELAY);
 }
 
@@ -293,6 +304,20 @@ function addFiles(descripts) {
     if (descripts.hasOwnProperty(f)) {
       if (!state.files[f] || !state.files[f].name) {
         state.files[f] = descripts[f];
+      }
+    }
+  }
+}
+
+function cleanTransfers() {
+  for (var v in finished_files) {
+    if (finished_files.hasOwnProperty(v)) {
+      for (var t in state.transfers) {
+        if (state.transfers.hasOwnProperty(t)) {
+          if (state.transfers.rec_block.file_id == v) {
+            updateBlockReceiving("", -1, t);
+          }
+        }
       }
     }
   }
