@@ -122,7 +122,7 @@ Link.prototype.reset = function() {
 	this.u = -0.5;
 };
 
-addTransfer = function(userid, file_id, chunkid, downloading) {
+addTransfer = function(userid, fileid, downloading) {
 
   //console.log("looking for " + file_id);
 
@@ -143,13 +143,13 @@ addTransfer = function(userid, file_id, chunkid, downloading) {
 		}
 	}
 
-	currenttransfers.push( new Transfer(unode.point, center, downloading, userid, file_id, chunkid, fnode.filledStyle) );
+	currenttransfers.push( new Transfer(unode.point, center, downloading, userid, file_id, fnode.filledStyle) );
 };
 
 removeTransfer = function(uid, file_id, chunkid, downloading) {
   for (var i = 0; i < currenttransfers.length; i++) {
 		var t = currenttransfers[i];
-		if (t.id == uid && t.fid == file_id && t.chunk == chunkid && t.down == downloading) {
+		if (t.id == uid && t.fid == file_id && t.down == downloading) {
 			currenttransfers.splice(i, 1);
       break;
     }
@@ -157,7 +157,7 @@ removeTransfer = function(uid, file_id, chunkid, downloading) {
 };
 
 // transferring file chunk of file pointfile from user a to user b
-function Transfer(pointuser, pointfile, downloading, uid, fid, cid, color) {
+function Transfer(pointuser, pointfile, downloading, uid, fid, color) {
 	console.log('making new transfer with file', fid, 'and downloading = ', downloading);
 	this.a = (downloading) ? pointuser : pointfile;
 	this.b = (downloading) ? pointfile : pointuser;
@@ -165,7 +165,6 @@ function Transfer(pointuser, pointfile, downloading, uid, fid, cid, color) {
 	// for indexing/removing transfers when the file is done
 	this.uid = uid;
 	this.file_id = fid;
-	this.chunkid = cid;
 	this.color = color;
 };
 
@@ -383,12 +382,12 @@ updateState = function() {
 		var found = false;
 		for (var userid in state.transfers) {
 			var trans = state.transfers[userid].send_block;
-			if (t.uid == userid && t.file_id == trans.file_id && t.chunkid == trans.block) {
+			if (t.uid == userid && t.file_id == trans.file_id) {
 				found = true;
 				break;
 			}
 			trans = state.transfers[userid].rec_block;
-			if (t.uid == userid && t.file_id == trans.file_id && t.chunkid == trans.block) {
+			if (t.uid == userid && t.file_id == trans.file_id) {
 				found = true;
 				break;
 			}
@@ -414,7 +413,7 @@ updateState = function() {
 
         //console.log("t = ");
         //console.log(t);
-    	  if (t.uid == userid && t.file_id == trans.file_id && t.chunkid == trans.block) {
+    	  if (t.uid == userid && t.file_id == trans.file_id) {
     	    found = true;
     	    break;
     	  }
@@ -422,7 +421,7 @@ updateState = function() {
 			if (!found) {
         console.log(trans);
         //console.log("1) calling addTransfer: " + trans + ", " + trans.file_id + ", " + trans.chunkid);
-        addTransfer(userid, trans.file_id, trans.block, false);
+        addTransfer(userid, trans.file_id, false);
       }
 		}
     trans = state.transfers[userid].rec_block;
@@ -430,7 +429,7 @@ updateState = function() {
 		if (trans.file_id != '') {
 			for (var i = 0; i < length; i++) {
 				var t = currenttransfers[i];
-    	  if (t.uid == userid && t.file_id == trans.file_id && t.chunkid == trans.block) {
+    	  if (t.uid == userid && t.file_id == trans.file_id) {
     	    found = true;
     	    break;
     	  }
@@ -438,7 +437,7 @@ updateState = function() {
     	if (!found) {
         //console.log(trans);
         //console.log("2) calling addTransfer: " + trans + ", " + trans.file_id + ", " + trans.block);
-        addTransfer(userid, trans.file_id, trans.block, true);
+        addTransfer(userid, trans.file_id, true);
       }
 		}
   }
