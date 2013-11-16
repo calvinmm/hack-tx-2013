@@ -1,6 +1,5 @@
-
-// TODO: fill in these global fields from server api calls
-var BROKER_HOST = "ec2-54-201-76-213.us-west-2.compute.amazonaws.com";
+var BROKER_HOST = "localhost"; //"ec2-54-201-76-213.us-west-2.compute.amazonaws.com";
+var API_HOST = "http://" + BROKER_HOST;
 var BROKER_PORT = 8080;
 
 var peer = new Peer({
@@ -15,6 +14,7 @@ var master = "master";
 // Connect to the broker server
 peer.on('open', function(id) {
   me = id;
+  state.others.push(me);
 });
 
 var BLOCK_SIZE = 4096;
@@ -55,8 +55,8 @@ function masterStart(filesToUpload) {
 
 function registerFile(room_id, file) {
   var deferred = $.Deferred();
-  $.post('/api/new_file', {
-    size: file.size,
+  $.post(API_HOST + '/new_file', {
+    size: Math.ceil(file.size / BLOCK_SIZE),
     room_id: room_id,
     peer_id: me
   }, function(file_id) {
@@ -69,7 +69,7 @@ function registerFile(room_id, file) {
 
 function registerRoom() {
   var deferred = $.Deferred();
-  $.post('/api/new_room', function(data) {
+  $.post(API_HOST + '/new_room', function(data) {
     console.log("should be room_id", data);
     deferred.resolve(data);
   });
@@ -77,7 +77,7 @@ function registerRoom() {
 }
 
 function informServer(file_id, block_num) {
-  $.post("/api/update/" + file_id, {peer_id: me, block_id: block_num}, function(data) {
+  $.post(API_HOST + "/update/" + file_id, {peer_id: me, block_id: block_num}, function(data) {
     // Don't really care about a response
     console.log("update response: ", data);
   });
@@ -97,7 +97,7 @@ function getParticipants() {
   if (file_id == "") {
     return;
   }
-  $.get("/api/subscribe/" + file_id + "?peer_id=" + me, function(data) {
+  $.get(API_HOST + "/subscribe/" + file_id + "?peer_id=" + me, function(data) {
     console.log("should be an array of peers", data);
     addNewPeers(data);
     getParticipants();
@@ -149,24 +149,25 @@ function addPeer(peer_id) {
 
 function emptyFiles() {
   if (!state.files) {
-    return false;
+    return true;
   }
   for (var v in state.files) {
     if (state.files.hasOwnProperty(v)) {
-      return true;
+      return false;
     }
   }
-  return false;
+  return true;
 }
 
 function updateOtherState() {
   if (emptyFiles()) {
     console.log("Doesn't know of any files. ");
     if (global_room_id == -1) {
+      console.log("No room id yet...");
       return;
     }
-    $.get("/api/files/" + global_room_id, function(data) {
-      console.log("got /api/files", data);
+    $.get(API_HOST + "/files/" + global_room_id, function(data) {
+      console.log("got /files", data);
       for (var i = 0; i < data.length; i++) {
         state.files[data[i]] = {};
       }
@@ -177,12 +178,20 @@ function updateOtherState() {
   for (var file_id in state.files) {
     if (state.files.hasOwnProperty(file_id)) {
       // fire off ajax request
-      $.get("/api/status/" + file_id, function(data) {
-        console.log("should be the new other_state", data);
+      $.get(API_HOST + "/status/" + file_id, function(data) {
+        console.log("we got some new state: ");
+        console.log(data);
         addNewPeersFromNewState(data);
-        state.other_states = data;
-      })
+        updateFileState(file_id, data);
+        console.log("New state object", state);
+      });
     }
+  }
+}
+
+function updateFileState(file_id, data) {
+  for (var peer_id in state.others) {
+    state.other_states[peer_id] = data[peer_id];
   }
 }
 
@@ -199,7 +208,8 @@ function masterAddedFile(file, file_id) {
     size: file.size,
     num_blocks: n,
     blocks: blocks
-  }
+  };
+  console.log(state);
 }
 
 // Sends a message to another user
