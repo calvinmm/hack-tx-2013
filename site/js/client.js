@@ -38,6 +38,20 @@ var message_types = {
   RES_BLOCK : 3
 };
 
+function masterStart(filesToUpload) {
+  if (filesToUpload.length == 0) {
+    return;
+  }
+  for (var i = 0; i < filesToUpload.length; i++) {
+    masterAddedFile(filesToUpload[i]);
+  }
+  // TODO: register room
+  var room_id = "ahsldfkjl";
+  setupRoom(room_id);
+  // TODO: register each file with the room
+  // TODO: tell server we have every part of every file
+}
+
 function informServer(file_id, block_num) {
   $.post("/api/update/" + file_id, {peer_id: me, block_id: block_num}, function(data) {
     // Don't really care about a response
@@ -202,6 +216,10 @@ function addFiles(descripts) {
       }
     }
   }
+}
+
+function refreshPeers() {
+  // TODO: call updatePeer on everyone
 }
 
 function updatePeer(peer_id) {
