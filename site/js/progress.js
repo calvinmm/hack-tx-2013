@@ -24,9 +24,11 @@ function displayProgress(fileNodes) {
 
         // TODO what are file units
         var currentElement = $("<li>", {
-            "text": currentFile.name + " | " + currentFile.size;
+            "class": "list-group-item",
+            "text": currentFile.name + " | " + currentFile.size
         }).append($("<li>", {
-            "class": "list-group-item"
+            "class": "list-group-item",
+            "id": "omit-border"
         }).append(bar.append(barbar)));
 
         $(build).append(currentElement);

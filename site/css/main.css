@@ -35,7 +35,7 @@ button.pad {
 }
 
 #canvasdiv {
-    height: 640px;
+    height: 500px;
     width: 640px;
     margin: 20px auto;
 }
@@ -53,4 +53,9 @@ button.pad {
 
 #content {
     display: none;
+}
+
+#omit-border {
+    border: 0px;
+    padding-bottom: 0px;
 }
