@@ -35,7 +35,7 @@ button.pad {
 }
 
 #canvasdiv {
-    height: 640px;
+    height: 500px;
     width: 640px;
     margin: 20px auto;
 }
@@ -47,5 +47,15 @@ button.pad {
 }
 
 #container-nopad {
+    display: none;
     padding-top: 0px !important;
+}
+
+#content {
+    display: none;
+}
+
+#omit-border {
+    border: 0px;
+    padding-bottom: 0px;
 }

@@ -3,7 +3,151 @@ var width = $(visCanvas).attr("width");
 var height = $(visCanvas).attr("height");
 var ctx = c.getContext('2d');
 
+
 // set up state
+var me = 'user4';
+
+var state = {
+	others: ['user1', 'user4', 'user2', 'user3'],
+	other_state: {
+		user1: {
+			file1: [1, 2, 5, 6],
+			file2: [1, 3]
+		},
+		user2: {
+			file1 : [2, 6],
+			file3: [2, 4]
+		},
+		user3: {
+			file4: [1, 2, 3]
+		},
+		// me
+		user4: {
+			file1: [3, 4],
+			file2: [2, 4],
+			file4: [4, 5]
+		}
+	},
+	files : {
+		file1: {
+			name: "doge.txt",
+			size: 1025,
+			num_blocks: 6,
+			blocks: [3, 4]
+		},
+		file2: {
+			name: "poop.gif",
+			size: 69,
+			num_blocks: 4,
+			blocks: [2, 4]
+		},
+		file3: {
+			name: "hack.jar",
+			size: 1337,
+			num_blocks: 3,
+			blocks: []
+		},
+		file4: {
+			name: "file4",
+			size: 4,
+			num_blocks: 4,
+			blocks: [4, 5]
+		}
+	},
+	transfers: {
+		user1: {
+			send_block: {
+				fileid: '',
+				block: -1
+			},
+			rec_block: {
+				fileid: 'file1',
+				block: 2
+			}
+		},
+		user2: {
+			send_block: {
+				fileid: 'file3',
+				block: 4
+			},
+			rec_block: {
+				fileid: '',
+				block: -1
+			}
+		}
+	}
+};
+
+var deltastate = {
+	others: ['user1', 'user4', 'user2', 'userQ', 'user3'],
+	other_state: {
+		user1: {
+			file1: [1, 2, 5, 6],
+			file2: [1, 3]
+		},
+		user2: {
+			file1 : [2, 6],
+			file3: [2, 4]
+		},
+		user3: {
+			file4: [1, 2, 3]
+		},
+		// me
+		user4: {
+			file1: [3, 4],
+			file2: [2, 4],
+			file4: [4, 5]
+		}
+	},
+	files : {
+		file1: {
+			name: "doge.txt",
+			size: 1025,
+			num_blocks: 6,
+			blocks: [3, 4, 5, 6]
+		},
+		file2: {
+			name: "poop.gif",
+			size: 69,
+			num_blocks: 4,
+			blocks: [1, 2, 4]
+		},
+		file3: {
+			name: "hack.jar",
+			size: 1337,
+			num_blocks: 3,
+			blocks: [1]
+		},
+		file4: {
+			name: "file4",
+			size: 4,
+			num_blocks: 5,
+			blocks: [1, 4, 5]
+		}
+	},
+	transfers: {
+		user1: {
+			send_block: {
+				fileid: 'file2',
+				block: 3
+			},
+			rec_block: {
+				fileid: '',
+				block: -1
+			}
+		},
+		user2: {
+			send_block: {
+				fileid: 'file3',
+				block: 4
+			},
+			rec_block: {
+				fileid: '',
+				block: -1
+			}
+		}
+	}
+};
 
 // points
 var userNodes = [];
@@ -75,24 +219,19 @@ nextPoint = function() {
 	}
 	bestAngle = Math.PI - bestAngle; // want 0 to be at 180 (first node is on left) and clockwise around
   // extend radius if would cause collisions
-	if (3 *userNodeRadius > radius * maxAngle) {
+	if (4 *userNodeRadius > radius * maxAngle) {
 		radius += 4 * userNodeRadius;
 	}
 	return new Point(center.x + radius * Math.cos(bestAngle), center.y + radius * Math.sin(bestAngle));
 };
 
 // Want to add you first, host second
-addUser = function(userid) {
-	var host = true;
-	if (undefined != head && undefined != head.next) {
-		host = false;
-	}
+addUser = function(userid, host) {
 	userNodes.push(new UserNode(nextPoint(), userid, host));
 };
 
-addFile = function(fileid) {
-	var numchunks = 10 + Math.floor(Math.random() * 20);
-	fileNodes.push(new FileNode(fileid, numchunks /*use fileid to get number of chunks?*/));
+addFile = function(name, size, fileid, numchunks, curchunks) {
+	fileNodes.push(new FileNode(name, size, fileid, numchunks, curchunks));
 	totalFileChunks += numchunks;
 };
 
@@ -182,8 +321,8 @@ Transfer.prototype.update = function(distToMove) {
 };
 
 randomFileStyle = function(fnode) {
-	// want random value between 20 and FF for each base color so the filled color can be slightly darker (20 darker to be exact)
-	var decbase = 96;
+	// want random value between base and FF for each base color so the filled color can be darker
+	var decbase = 80;
   var decFF = 255;
 	var redval = Math.floor(Math.random() * (decFF - decbase + 1));
 	var greenval = Math.floor(Math.random() * (decFF - decbase + 1));
@@ -201,10 +340,12 @@ hexDig = function(i) {
 	else return String.fromCharCode('A'.charCodeAt(0) + (i - 10));
 };
 
-function FileNode(fileid, totchunks) {
+function FileNode(name, size, fileid, totchunks, curchunks) {
+	this.name = name;
+	this.size = size;
 	this.id = fileid;
 	this.totalchunks = totchunks;
-	this.curchunks = 0;
+	this.curchunks = (undefined == curchunks) ? 0 : curchunks;
 	this.filledStyle = undefined;
 	this.clearStyle = undefined;
 	randomFileStyle(this);
@@ -214,10 +355,9 @@ FileNode.prototype.progress = function() {
 	return 1.0 * this.curchunks/this.totalchunks;
 };
 
-function UserNode(point, userid, me, host) {
+function UserNode(point, userid, host) {
 	this.point = point;
 	this.id = userid;
-	this.me = me;
 	this.host = host;
 };
 
@@ -345,17 +485,121 @@ testAddFile = function() {
 	}
 };
 
+updateState = function() {
+	// go through users to see if need to add any of users
+	var user_list = state.others;
+	for (var i = 0; i < user_list.length; i++) {
+		var userid = user_list[i];
+		if (userid == me) continue;
+		var found = false;
+		for (var j = 0; j < userNodes.length; j++) {
+			if(userNodes[j].id == userid) {
+				found = true;
+				break;	
+			}
+		}
+		if (!found) {
+			// TODO how to determine host?
+			addUser(userid, false);
+		}
+	}
+	// don't need the info on each user in other_state
+	
+	// parse files to see how much of each file you have
+	for (var fileid in state.files) {
+		var file = state.files[fileid];
+		var found = false;	
+		for (var i = 0; i < fileNodes.length; i++) {
+			if (fileNodes[i].id == fileid) {
+				// update this dude
+				fileNodes[i].curchunks = file.blocks.length;
+				found = true;
+				break;
+			}
+		}
+		if(!found) {
+			addFile(file.name, file.size, fileid, file.num_blocks, file.blocks.length);
+		}
+	}
+	// tricky part: remove all old transfers that are not in the new state, then add all new ones that are not in the old state
+  var newtransfers = [];
+	for(var i = 0; i < currenttransfers.length; i++) {
+		var t = currenttransfers[i];
+		var found = false;
+		for (var userid in state.transfers) {
+			var trans = state.transfers[userid].send_block;
+			if (t.id == userid && t.fileid == trans.fileid && t.chunk == trans.block && !t.down) {
+				found = true;
+				break;
+			}
+			trans = state.transfers[userid].rec_block;
+			if (t.id == userid && t.fileid == trans.fileid && t.chunk == trans.block && t.down) {
+				found = true;
+				break;
+			}
+		}
+		if (found) {
+			newtransfers.push(t);
+		}
+	}
+	currenttransfers = newtransfers;
+	var length = currenttransfers.length; // don't need to check ones we add in here
+	for(var userid in state.transfers) {
+    var found = false;
+    var trans = state.transfers[userid].send_block;
+		if (trans.fileid!= '') {
+    	for (var i = 0; i < length; i++) {
+    		var t = currenttransfers[i];
+    	  if (t.id == userid && t.fileid == trans.fileid && t.chunk == trans.block && !t.down) {
+    	    found = true;
+    	    break;
+    	  }
+			}
+			if (!found) addTransfer(userid, trans.fileid, trans.chunkid, false);
+		}
+    trans = state.transfers[userid].rec_block;
+		found = false;
+		if (trans.fileid != '') {
+			for (var i = 0; i < length; i++) {
+				var t = currenttransfers[i];
+    	  if (t.id == userid && t.fileid == trans.fileid && t.chunk == trans.block && t.down) {
+    	    found = true;
+    	    break;
+    	  }
+    	}
+    	if (!found) addTransfer(userid, trans.fileid, trans.block, true);
+		}
+  }
+	// call calvin's function to update progress bars
+	//displayProgress(fileNodes);
+};
+
+testDeltaState = function() {
+	state = deltastate;
+	updateState();
+}
+
 init = function() {
 	center = new Point(width / 2, height / 2);
 	// add some stuff for testing 
-	addFile(0);
+	/*addFile(0);
 	addUser(2);
 	addUser(12);	
 	addTransfer(2, 0, 69, false);
-	setTimeout(loop, 10);
 	setTimeout(testFillChunks, 2000);
-	//setTimeout(testAddUser, 800);
-	setTimeout(testAddFile, 1);
+	setTimeout(testAddUser, 800);
+	setTimeout(testAddFile, 1);*/
+	updateState();
+	// have state from the server or whatever
+	
+	
+	setTimeout(loop, 10);
+	
+	//setTimeout(testDeltaState, 12000);
 };
+
+poll = function() {
+	updateState();
+}; //poll server, update state based on that
 
 init();
