@@ -6,14 +6,6 @@ Proposed API
   Creates a new file object, with given number of blocks
   Returns a file_id
 
-* > GET /file/file_id
-  Returns a JSON object:
-  > { size=Number of blocks
-  >  peers=[Array of peer ids]
-  > }
-
-  (I assume we can encode the way to connect to the peers in an id of some sort)
-
 * > GET /subscribe/file_id?peer_id=peerid
   Longpolling, returns a peer id when a new peer connects for the file.
   Registers this peer with the server

@@ -25,7 +25,8 @@ Q.ninvoke(client, "connect").then(
       return query('CREATE TABLE status' +
                    '( file_id INT REFERENCES files(file_id), ' +
                    'peer_id INT REFERENCES peers(peer_id),' +
-                   'block_id INT)');
+                   'block_id INT,' +
+                   'UNIQUE(file_id, peer_id, block_id))');
     }
   ).then(
     function() {
