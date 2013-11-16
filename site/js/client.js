@@ -235,13 +235,28 @@ function masterAddedFile(file, file_id) {
 
 var DELAY = 0;
 
+var RETRY_LIMIT = 100;
+var retry_limits = {};
+
 // Sends a message to another user
 function sendMessage(message, rec) {
   message.sender = me;
   setTimeout(function() {
     if (connections[rec] === undefined) {
       // Retry if other user hasn't connected yet
-      sendMessage(message, rec);
+      if (!retry_limits[rec]) {
+        retry_limits[rec] = 1;
+      } else if (retry_limits[rec] < RETRY_LIMIT) {
+        retry_limits[rec] += 1;
+        sendMessage(message, rec);
+      } else {
+        // Assume this rec is dead
+        if (message.type == message_types.REQ_BLOCK) {
+          updateBlockReceiving("", -1, rec);
+        } else if (message.type == message_types.RES_BLOCK) {
+          updateBlockSending("", -1, rec);
+        }
+      }
     } else {
       connections[rec].send(message);
     }

@@ -22,7 +22,7 @@ app.configure('development', function() {
 
 
 var connection_config =  {
-  user: 'adamf',
+  user: 'postgres',
   database: 'hacktx',
   host: 'localhost',
   port: 5432,
