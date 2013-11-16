@@ -97,6 +97,7 @@ function Point(x, y) {
 
 function Link(a, b) {
   //debugger;
+  //console.log(currenttransfers);
   this.a = a;
   this.b = b;
   this.u = 0.0;
@@ -385,12 +386,12 @@ updateState = function() {
 		var found = false;
 		for (var userid in state.transfers) {
 			var trans = state.transfers[userid].send_block;
-			if (t.id == userid && t.file_id == trans.file_id && t.chunk == trans.block && !t.down) {
+			if (t.uid == userid && t.file_id == trans.file_id && t.chunkid == trans.block) {
 				found = true;
 				break;
 			}
 			trans = state.transfers[userid].rec_block;
-			if (t.id == userid && t.file_id == trans.file_id && t.chunk == trans.block && t.down) {
+			if (t.uid == userid && t.file_id == trans.file_id && t.chunkid == trans.block) {
 				found = true;
 				break;
 			}
@@ -416,7 +417,7 @@ updateState = function() {
 
         //console.log("t = ");
         //console.log(t);
-    	  if (t.id == userid && t.file_id == trans.file_id && t.chunk == trans.block && !t.down) {
+    	  if (t.uid == userid && t.file_id == trans.file_id && t.chunkid == trans.block) {
     	    found = true;
     	    break;
     	  }
@@ -432,7 +433,7 @@ updateState = function() {
 		if (trans.file_id != '') {
 			for (var i = 0; i < length; i++) {
 				var t = currenttransfers[i];
-    	  if (t.id == userid && t.file_id == trans.file_id && t.chunk == trans.block && t.down) {
+    	  if (t.uid == userid && t.file_id == trans.file_id && t.chunkid == trans.block) {
     	    found = true;
     	    break;
     	  }
