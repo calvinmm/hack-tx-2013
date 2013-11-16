@@ -15,7 +15,7 @@ var connections = {};
 // Only the master will have this
 var file_handles = {};
 // All peers will have this
-var file_part_handles = {};
+var finished_files = {};
 
 var message_types = {
   REQ_FILES : 0,
@@ -83,10 +83,18 @@ function processMessage(message) {
 function processData(message) {
   var sender = message.sender;
   if (message.type == message_types.RES_BLOCK) {
-    updateBlockReceiving("", -1, sender);
+    if (hasBlock(message.file_id, message.block_num)) {
+      // Already have this block fool
+      return;
+    }
+    writeBlock(message.file_id, message.block_num, message.data, sender);
   } else {
     console.log("unrecognized data message received", message);
   }
+}
+
+function hasBlock(file_id, block_num) {
+  return state.files[file_id].blocks.indexOf(block_num) != -1
 }
 
 // Asks someone for file descriptors
@@ -119,7 +127,6 @@ function addFiles(descripts) {
     if (descripts.hasOwnProperty(f)) {
       if (!state.files[f]) {
         state.files[f] = descripts;
-        file_part_handles[f] = {};
       }
     }
   }
@@ -153,13 +160,83 @@ function updatePeer(peer_id) {
   }
 }
 
+function getFileName(file_id, block_num) {
+  return file_id + '-' + block_num;
+}
+
+function addReceivedBlock(file_id, block_num) {
+  if (state.files[file_id].blocks.indexOf(block_num) == -1) {
+    state.files[file_id].blocks.push(block_num);
+  } else {
+    console.log("got same block again...", file_id, block_num);
+  }
+}
+
+function checkDoneWithFile(file_id) {
+  if (state.files[file_id].blocks.length == state.files[file_id].num_blocks) {
+    // Done with this file!
+    if (finished_files[file_id]) {
+      // Already done it!
+      return;
+    }
+    combine(file_id);
+  }
+}
+
 // Called by the client to write the files to the filesystem
-function writeBlock(file_id, block_num, data) {
+function writeBlock(file_id, block_num, data, sender) {
+  var filename = getFileName(file_id, block_num);
+  fs.root.getFile(filename, {create: true}, function(fileEntry) {
+    fileEntry.createWriter(function(fileWriter) {
+      fileWriter.onwriteend = function(e) {
+        addReceivedBlock(file_id, block_num);
+        updateBlockReceiving("", -1, sender);
+        checkDoneWithFile(file_id);
+      };
+      fileWriter.onerror = function(e) {
+        console.log("File:", filename, "failed to write to combined file", e);
+      };
+      fileWriter.write(data);
+    });
+  });
+}
+
+function readBlockDeferred(file_id, block_num) {
+  var deferred = $.Deferred();
+  var filename = getFileName(file_id, block_num);
+  fs.root.getFile(filename, {}, function(fileEntry) {
+    fileEntry.file(function(file) {
+      var reader = new FileReader();
+      reader.onloadend = function(evt) {
+        finished_files[file_id][block_num] =
+          new Blob([evt.target.result]);
+        deferred.resolve();
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  });
+  return deferred;
 }
 
 // Combine peer file part handles into full file
 function combine(file_id) {
-
+  finished_files[file_id] = {};
+  var reads = [];
+  for (var b = 0; b < state.files[file_id].num_blocks; b++) {
+    reads.push(readBlockDeferred(file_id, b));
+  }
+  $.when.apply($, reads).done(function() {
+    var fullFile = [];
+    for (var i = 0; i < state.files[file_id].num_blocks; i++) {
+      fullFile.push(finished_files[file_id][i]);
+      delete finished_files[file_id][i];
+    }
+    finished_files[file_id] = true;
+    saveAs(fullFile, state.files[file_id].name);
+    fullFile.length = 0;
+  }, function(err) {
+    console.log("Uh oh, ran into error loading a block", err);
+  });
 }
 
 function reqBlock(file_id, block_num, rec) {
@@ -226,24 +303,24 @@ function sendSlicedBlock(file_id, block_num, rec) {
 }
 
 function sendFSBlock(file_id, block_num , rec) {
-  var file = file_part_handles[file_id][block_num];
-  var reader = new FileReader();
-  reader.onloadend = function(evt) {
-    if (evt.target.readyState == FileReader.DONE) {
-      var newBlob = new Blob([evt.target.result], {type: "audio/wav"});
-      var m = {
-        file_id: file_id,
-        type: message_types.RES_BLOCK,
-        block_num: block_num,
-        data: newBlob
+  var filename = getFileName(file_id, block_num);   // this is just a string
+  fs.root.getFile(filename, {}, function(fileEntry) {
+    fileEntry.file(function(file) {
+      var reader = new FileReader();
+      reader.onloadend = function(evt) {
+        var newBlob = new Blob([evt.target.result], {type: "audio/wav"});
+        var m = {
+          file_id: file_id,
+          type: message_types.RES_BLOCK,
+          block_num: block_num,
+          data: newBlob
+        };
+        sendData(m, rec);
+        updateBlockSending("", -1, rec);
       };
-      sendData(m, rec);
-      updateBlockSending("", -1, rec);
-    }
-  };
-  var lim = state.files[file_id].size;
-  var blob = file.slice(0, lim);
-  reader.readAsArrayBuffer(blob);
+      reader.readAsArrayBuffer(file);
+    });
+  });
 }
 
 function s4() {

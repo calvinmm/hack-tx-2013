@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="FileSaver.js"></script>
+</head>
+<body>
+<input type="file" id="files" name="files[]" multiple />
+<output id="list"></output>
+<script>
+    window.requestFileSystem = window.requestFileSystem || window.webkitRequestFileSystem;
+    var fs = null;
+
+    function errorHandler(e) {
+        var msg = '';
+        switch (e.code) {
+            case FileError.QUOTA_EXCEEDED_ERR:
+                msg = 'QUOTA_EXCEEDED_ERR';
+                break;
+            case FileError.NOT_FOUND_ERR:
+                msg = 'NOT_FOUND_ERR';
+                break;
+            case FileError.SECURITY_ERR:
+                msg = 'SECURITY_ERR';
+                break;
+            case FileError.INVALID_MODIFICATION_ERR:
+                msg = 'INVALID_MODIFICATION_ERR';
+                break;
+            case FileError.INVALID_STATE_ERR:
+                msg = 'INVALID_STATE_ERR';
+                break;
+            default:
+                msg = 'Unknown Error';
+                break;
+        }
+        document.querySelector('#example-list-fs-ul').innerHTML = 'Error: ' + msg;
+    }
+
+    function initFS() {
+        window.requestFileSystem(window.TEMPORARY, 1024*1024, function(filesystem) {
+            fs = filesystem;
+        }, errorHandler);
+    }
+
+    function saveFile1() {
+        console.log("Beginning to write first file");
+        fs.root.getFile("File1", {create: true}, function(fileEntry) {
+            fileEntry.createWriter(function(fileWriter) {
+                fileWriter.onwriteend = function(e) {
+                    console.log("File:", "File1", "written to FS");
+                };
+                fileWriter.onerror = function(e) {
+                    console.log("File:", "File1", "failed to write to FS");
+                };
+                var blob = new Blob(["Hello "], {type: "text/plain"});
+                fileWriter.write(blob);
+            });
+        });
+    }
+
+    function saveFile2() {
+        console.log("Beginning to write second file");
+        fs.root.getFile("File2", {create: true}, function(fileEntry) {
+            console.log("have file entry");
+            fileEntry.createWriter(function(fileWriter) {
+                console.log("Writer created successfully");
+                fileWriter.onwriteend = function(e) {
+                    console.log(e);
+                    console.log("File:", "File2", "written to FS");
+                };
+                fileWriter.onerror = function(e) {
+                    console.log("File:", "File2", "failed to write to FS", e);
+                };
+                var blob = new Blob(["World!"], {type: "text/plain"});
+                fileWriter.write(blob);
+            });
+        });
+    }
+
+    function combineFiles() {
+        fs.root.getFile("File1", {}, function(fileEntry) {
+            console.log("read fileEntry:", fileEntry);
+            fileEntry.file(function(file) {
+                console.log("read in file", file);
+                var reader = new FileReader();
+                reader.onloadend = function(evt) {
+                    console.log("file read in");
+                    var blob = new Blob([evt.target.result], {type: "text/plain"});
+                    // Todo write the file to the new thing
+                    fs.root.getFile("Combined", {create: true}, function(fileEntry) {
+                        fileEntry.createWriter(function(fileWriter) {
+                            fileWriter.onwriteend = function(e) {
+                                // TODO the append
+                                fs.root.getFile("File2", {}, function(fileEntry) {
+                                    fileEntry.file(function(file) {
+                                        var reader = new FileReader();
+                                        reader.onloadend = function(evt2) {
+                                            console.log("read in file", file);
+                                            var secondBlob = new Blob([evt2.target.result], {type: "text/plain"});
+                                            fs.root.getFile("Combined", {create: false}, function(fileEntry) {
+                                                fileEntry.createWriter(function(fileWriter) {
+                                                    fileWriter.seek(fileWriter.length);
+                                                    fileWriter.onwriteend = function(e) {
+                                                        console.log("DONE");
+                                                    };
+                                                    fileWriter.write(secondBlob);
+                                                });
+                                            });
+                                        };
+                                        reader.readAsArrayBuffer(file);
+                                    });
+                                });
+                            };
+                            fileWriter.onerror = function(e) {
+                                console.log("File:", "File1", "failed to write to combined file", e);
+                            };
+                            fileWriter.write(blob);
+                        });
+                    });
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        })
+    }
+
+    function downloadFile() {
+        var filename = "Combined";
+        fs.root.getFile(filename, {}, function(fileEntry) {
+
+            fileEntry.file(function(file) {
+                console.log("read in file", file);
+                var reader = new FileReader();
+                reader.onloadend = function(evt) {
+                    saveAs(new Blob([evt.target.result]), "Done?");
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        });
+    }
+</script>
+<button onclick="initFS();">Start FS</button>
+<button onclick="saveFile1();">Save File 1</button>
+<button onclick="saveFile2();">Save File 2</button>
+<button onclick="combineFiles();">Combine Files</button>
+<button onclick="downloadFile();">Download Combined</button>
+</body>
+<script src=client.js></script>
+</html>
