@@ -85,18 +85,43 @@ function add_file(size, room_id) {
   });
 }
 
+function add_room() {
+  return query('INSERT INTO rooms DEFAULT VALUES RETURNING room_id')
+  .then(function(result) {
+    return result.rows[0].room_id;
+  });
+}
+
+function get_files_for_room(room_id) {
+  return query('SELECT file_id FROM files WHERE room_id=$1', [room_id])
+  .then(function(result) {
+    return result.rows.map(function(row) {
+      return row.file_id;
+    });
+  });
+}
+
 Q.ninvoke(client, "connect").then(
   function() {
 
     // Maps from file_ids to res's that are subscribed to the file
     var subscribers = {};
 
+    app.post('/new_room', function(req, res) {
+      add_room().then(
+        function(room_id) {
+          res.send(room_id.toString());
+        }
+      );
+    });
+
+
     app.post('/new_file', function(req, res) {
       var size = parseInt(req.body.size);
       var room_id = parseInt(req.body.room_id);
       add_file(size, room_id).then(
         function(file_id) {
-          res.send(file_id);
+          res.send(file_id.toString());
         }
       ).catch(
         function(err) {
@@ -104,6 +129,13 @@ Q.ninvoke(client, "connect").then(
           res.send('errror: ' + err);
         }
       );
+    });
+
+    app.get('/files/:room_id', function(req, res) {
+      var room_id = req.params.room_id;
+      get_files_for_room(room_id).then(function(files) {
+        res.send(files);
+      });
     });
 
     app.get('/subscribe/:file_id', function(req, res) {
