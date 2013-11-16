@@ -24,17 +24,24 @@ var message_types = {
   RES_BLOCK : 3
 };
 
-// Should be called when a file is selected
-function handleFileSelect(evt) {
-  evt.stopPropagation();
-  evt.preventDefault();
+function informServer(file_id, block_num) {
 
-  var files = evt.dataTransfer.files; // FileList object.
+}
 
-  // files is a FileList of File objects. List some properties.
-  var output = [];
-  for (var i = 0, f; f = files[i]; i++) {
-    masterAddedFile(f);
+function getParticipants() {
+  // Initially called to get all people in room, recursively called for
+  // continuous updates
+
+}
+
+function updateOtherState() {
+  for (var filename in state.files) {
+    if (state.files.hasOwnProperty(filename)) {
+      // fire off ajax request
+      $.get("/file/" + filename, function(data) {
+        console.log("got new state: ", data);
+      })
+    }
   }
 }
 
